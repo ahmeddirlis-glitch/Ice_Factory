@@ -1,0 +1,6 @@
+{
+  "name": "Brohi Ice Factory",
+  "description": "Mobile management app for Brohi Ice Factory: sales, production, stock, expenses, face attendance, payroll, funding, and voice AI commands.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

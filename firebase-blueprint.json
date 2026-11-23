@@ -1,0 +1,502 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user preferences and personal contact info",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User full name" },
+        "email": { "type": "string", "description": "User email" },
+        "phone": { "type": "string", "description": "User phone number" },
+        "photoUrl": { "type": "string", "description": "Profile photo URL" },
+        "preferredLanguage": { "type": "string", "enum": ["en", "ur"] },
+        "darkMode": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "preferredLanguage", "darkMode", "createdAt", "updatedAt"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Factory employee directory, role, salary, and encrypted face template (Owner only)",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "authUid": { "type": "string" },
+        "name": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "cnic": { "type": "string" },
+        "role": { "type": "string", "enum": ["Super Admin", "Owner", "Admin", "Manager", "Staff"] },
+        "salary": { "type": "number" },
+        "shift": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "skipLiveness": { "type": "boolean" },
+        "faceTemplateEncrypted": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "phone", "cnic", "role", "salary", "shift", "joinDate", "emergencyContact", "skipLiveness", "active", "createdAt", "updatedAt"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Daily face-verified check-in and check-out record",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "authUid": { "type": "string" },
+        "date": { "type": "string" },
+        "checkIn": { "type": "string" },
+        "checkOut": { "type": "string" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Leave", "Checked Out"] },
+        "bypassed": { "type": "boolean" },
+        "hours": { "type": "number" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "employeeId", "employeeName", "authUid", "date", "checkIn", "checkOut", "status", "bypassed", "hours", "memberUids", "createdAt", "updatedAt"]
+    },
+    "ProductionRecord": {
+      "title": "ProductionRecord",
+      "description": "Daily ice production entry in tons",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "date": { "type": "string" },
+        "tons": { "type": "number" },
+        "productType": { "type": "string" },
+        "machineId": { "type": "string" },
+        "machineName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "date", "tons", "productType", "machineId", "machineName", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "InventoryMovement": {
+      "title": "InventoryMovement",
+      "description": "Cold room stock overview and stock in/out movement",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "product": { "type": "string" },
+        "tons": { "type": "number" },
+        "location": { "type": "string" },
+        "movementType": { "type": "string", "enum": ["IN", "OUT", "ADJUST"] },
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "product", "tons", "location", "movementType", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Ice factory customer ledger and outstanding credit balance",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "balance": { "type": "number" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "phone", "balance", "memberUids", "createdAt", "updatedAt"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Ice sales and invoice entry (paid or credit)",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "product": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "unitPrice": { "type": "number" },
+        "total": { "type": "number" },
+        "paid": { "type": "boolean" },
+        "paidAmount": { "type": "number" },
+        "date": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "source": { "type": "string", "enum": ["manual", "voice"] },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "invoiceNumber", "customerId", "customerName", "product", "quantity", "unitPrice", "total", "paid", "paidAmount", "date", "createdBy", "source", "memberUids", "createdAt", "updatedAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Operating expense or factory build capital investment entry",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "enum": ["Electricity", "Rent", "Diesel", "Water", "Salary", "Refreshment", "Maintenance", "Supplier", "Other", "Factory Build"] },
+        "capitalInvestment": { "type": "boolean" },
+        "date": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "source": { "type": "string", "enum": ["manual", "voice"] },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "description", "amount", "category", "capitalInvestment", "date", "createdBy", "source", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FundingEntry": {
+      "title": "FundingEntry",
+      "description": "Owner-only loans and investor capital funding ledger",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "source": { "type": "string", "enum": ["Friend", "Bank", "Investor", "Customer"] },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["Loan", "Investment"] },
+        "amount": { "type": "number" },
+        "repaid": { "type": "number" },
+        "interest": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "source", "name", "type", "amount", "repaid", "interest", "date", "createdAt", "updatedAt"]
+    },
+    "PayrollRecord": {
+      "title": "PayrollRecord",
+      "description": "Owner-only monthly salary and payroll slips",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "authUid": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "month": { "type": "string" },
+        "baseSalary": { "type": "number" },
+        "advances": { "type": "number" },
+        "deductions": { "type": "number" },
+        "netPay": { "type": "number" },
+        "paid": { "type": "boolean" },
+        "paidDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "employeeId", "employeeName", "month", "baseSalary", "advances", "deductions", "netPay", "paid", "createdAt", "updatedAt"]
+    },
+    "UtilityReading": {
+      "title": "UtilityReading",
+      "description": "Electricity, diesel, and water meter readings and bills",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Electricity", "Diesel", "Water"] },
+        "meterReading": { "type": "number" },
+        "unitsOrLiters": { "type": "number" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "type", "meterReading", "unitsOrLiters", "amount", "date", "memberUids", "createdAt", "updatedAt"]
+    },
+    "DeliveryItem": {
+      "title": "DeliveryItem",
+      "description": "Vehicle and delivery dispatch tracking",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "vehicleNumber": { "type": "string" },
+        "driverName": { "type": "string" },
+        "route": { "type": "string" },
+        "customerName": { "type": "string" },
+        "tons": { "type": "number" },
+        "status": { "type": "string", "enum": ["Idle", "Loading", "On route", "Delivered"] },
+        "date": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "vehicleNumber", "driverName", "route", "customerName", "tons", "status", "date", "memberUids", "createdAt", "updatedAt"]
+    },
+    "MachineItem": {
+      "title": "MachineItem",
+      "description": "Factory ice machine and maintenance schedule",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "model": { "type": "string" },
+        "capacityTonsPerDay": { "type": "number" },
+        "lastServicedDate": { "type": "string" },
+        "nextServiceDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Operational", "Needs Service", "Breakdown"] },
+        "breakdownNote": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "model", "capacityTonsPerDay", "lastServicedDate", "nextServiceDate", "status", "memberUids", "createdAt", "updatedAt"]
+    },
+    "SupplierItem": {
+      "title": "SupplierItem",
+      "description": "Supplier accounts, purchases, and dues",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "itemSupplied": { "type": "string" },
+        "totalPurchases": { "type": "number" },
+        "dues": { "type": "number" },
+        "lastPaymentDate": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "phone", "itemSupplied", "totalPurchases", "dues", "memberUids", "createdAt", "updatedAt"]
+    },
+    "SafetyIncident": {
+      "title": "SafetyIncident",
+      "description": "Safety incident report and follow-up",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "severity": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved"] },
+        "followUp": { "type": "string" },
+        "reportedBy": { "type": "string" },
+        "date": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "title", "description", "severity", "status", "reportedBy", "date", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FactorySettings": {
+      "title": "FactorySettings",
+      "description": "Company profile, rates, and operations start date",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "iceBlockRate": { "type": "number" },
+        "iceCubeRate": { "type": "number" },
+        "operationsStartDate": { "type": "string" },
+        "notificationsEnabled": { "type": "boolean" },
+        "seededDemo": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "companyName", "phone", "address", "iceBlockRate", "iceCubeRate", "operationsStartDate", "notificationsEnabled", "seededDemo", "createdAt", "updatedAt"]
+    },
+    "FactoryDirectoryEntry": {
+      "title": "FactoryDirectoryEntry",
+      "description": "Primary factory owner lookup entry for linking staff and admins",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "companyName", "ownerName", "createdAt", "updatedAt"]
+    },
+    "AppReleaseConfig": {
+      "title": "AppReleaseConfig",
+      "description": "Live app release metadata for cross-user update notifications and APK download",
+      "type": "object",
+      "properties": {
+        "latestVersionCode": { "type": "integer" },
+        "latestVersionName": { "type": "string" },
+        "releaseNotes": { "type": "string" },
+        "releaseNotesUrdu": { "type": "string" },
+        "apkDownloadUrl": { "type": "string" },
+        "mandatory": { "type": "boolean" },
+        "publishedBy": { "type": "string" },
+        "publishedAtIso": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["latestVersionCode", "latestVersionName", "createdAt", "updatedAt"]
+    },
+    "RegistrationRequest": {
+      "title": "RegistrationRequest",
+      "description": "Staff/Manager/Admin/Super Admin registration approval request",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "applicantUid": { "type": "string" },
+        "name": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "cnic": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "requestedRole": { "type": "string" },
+        "shift": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "startingSalary": { "type": "number" },
+        "reviewNote": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "applicantUid", "name", "cnic", "phone", "requestedRole", "shift", "status", "emergencyContact", "createdAt", "updatedAt"]
+    },
+    "ProfileUpdateRequest": {
+      "title": "ProfileUpdateRequest",
+      "description": "Full profile update request submitted by non-admin users (no role or salary fields) awaiting Admin / Super Admin approval",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "applicantUid": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "name": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "cnic": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "shift": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "reviewNote": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "applicantUid", "name", "cnic", "phone", "shift", "joinDate", "emergencyContact", "status", "createdAt", "updatedAt"]
+    },
+    "FactoryNotice": {
+      "title": "FactoryNotice",
+      "description": "Holiday and operational broadcast notice",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "titleUrdu": { "type": "string" },
+        "message": { "type": "string" },
+        "messageUrdu": { "type": "string" },
+        "noticeType": { "type": "string", "enum": ["Holiday", "Urgent", "Salary", "General"] },
+        "date": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "title", "message", "noticeType", "date", "active", "createdByName", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/factory_directory/{directoryId}": {
+      "schema": { "$ref": "#/entities/FactoryDirectoryEntry" },
+      "description": "Primary factory owner directory entry"
+    },
+    "/app_releases/{releaseId}": {
+      "schema": { "$ref": "#/entities/AppReleaseConfig" },
+      "description": "Latest app update release metadata for all users"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user settings and profile"
+    },
+    "/factories/{factoryId}/registration_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/RegistrationRequest" },
+      "description": "Staff and admin registration requests awaiting Super Admin approval"
+    },
+    "/factories/{factoryId}/profile_update_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/ProfileUpdateRequest" },
+      "description": "Non-admin user profile update requests awaiting Admin / Super Admin approval"
+    },
+    "/factories/{factoryId}/notices/{noticeId}": {
+      "schema": { "$ref": "#/entities/FactoryNotice" },
+      "description": "Factory holiday and operational notices"
+    },
+    "/factories/{factoryId}/employees/{employeeId}": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Owner-only staff roster and encrypted face templates"
+    },
+    "/factories/{factoryId}/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/AttendanceRecord" },
+      "description": "Staff attendance check-in/out records"
+    },
+    "/factories/{factoryId}/production/{productionId}": {
+      "schema": { "$ref": "#/entities/ProductionRecord" },
+      "description": "Ice production logs in tons"
+    },
+    "/factories/{factoryId}/inventory/{inventoryId}": {
+      "schema": { "$ref": "#/entities/InventoryMovement" },
+      "description": "Cold room stock and inventory movements"
+    },
+    "/factories/{factoryId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer credit ledger"
+    },
+    "/factories/{factoryId}/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Sales and invoicing entries"
+    },
+    "/factories/{factoryId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Daily expenses and factory build capital entries"
+    },
+    "/factories/{factoryId}/funding/{fundingId}": {
+      "schema": { "$ref": "#/entities/FundingEntry" },
+      "description": "Owner-only funding and loan ledger"
+    },
+    "/factories/{factoryId}/payroll/{payrollId}": {
+      "schema": { "$ref": "#/entities/PayrollRecord" },
+      "description": "Owner-only salary and payroll records"
+    },
+    "/factories/{factoryId}/utilities/{utilityId}": {
+      "schema": { "$ref": "#/entities/UtilityReading" },
+      "description": "Electricity, diesel, and water readings and bills"
+    },
+    "/factories/{factoryId}/deliveries/{deliveryId}": {
+      "schema": { "$ref": "#/entities/DeliveryItem" },
+      "description": "Vehicle dispatch and delivery tracking"
+    },
+    "/factories/{factoryId}/machines/{machineId}": {
+      "schema": { "$ref": "#/entities/MachineItem" },
+      "description": "Ice machines and service schedules"
+    },
+    "/factories/{factoryId}/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/entities/SupplierItem" },
+      "description": "Suppliers, purchases, and dues"
+    },
+    "/factories/{factoryId}/incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/SafetyIncident" },
+      "description": "Safety incident reports"
+    },
+    "/factories/{factoryId}/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/FactorySettings" },
+      "description": "Owner-only factory configuration"
+    }
+  }
+}

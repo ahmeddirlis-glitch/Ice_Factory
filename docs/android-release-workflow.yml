@@ -1,0 +1,186 @@
+name: Build & Auto-Release APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Optional English release notes"
+        required: false
+        default: ""
+      mandatory:
+        description: "Mark update as mandatory (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_release:
+    name: Build APK & Publish GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Prepare .env for Secrets Plugin
+        run: |
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+      - name: Compute auto-incrementing versionCode & versionName
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_RUN_NUM: ${{ github.run_number }}
+        run: |
+          BASE_CODE=$(grep -E "versionCode\s*=" app/build.gradle.kts | head -n1 | tr -dc '0-9')
+          BASE_CODE=${BASE_CODE:-2}
+
+          LATEST_TAG_JSON=$(gh release list --limit 1 --json tagName 2>/dev/null || echo "[]")
+          PREV_CODE=$(echo "$LATEST_TAG_JSON" | python3 -c "import sys, json, re
+          data = json.load(sys.stdin)
+          if not data:
+              print(0)
+          else:
+              tag = data[0].get('tagName', '')
+              m = re.search(r'(?:-b|\+|b)(\d+)$', tag)
+              print(int(m.group(1)) if m else 0)
+          ")
+
+          CANDIDATE_CODE=$((BASE_CODE + BASE_RUN_NUM))
+          if [ "$PREV_CODE" -ge "$CANDIDATE_CODE" ]; then
+            NEW_CODE=$((PREV_CODE + 1))
+          else
+            NEW_CODE=$CANDIDATE_CODE
+          fi
+          NEW_NAME="1.1.${BASE_RUN_NUM}"
+          TAG="v${NEW_NAME}-b${NEW_CODE}"
+
+          echo "version_code=${NEW_CODE}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${NEW_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+          sed -i -E "s/versionCode\s*=\s*[0-9]+/versionCode = ${NEW_CODE}/" app/build.gradle.kts
+          sed -i -E "s/versionName\s*=\s*\"[^\"]+\"/versionName = \"${NEW_NAME}\"/" app/build.gradle.kts
+          grep -E "versionCode|versionName" app/build.gradle.kts
+
+      - name: Configure Signing & Build APK
+        id: build_apk
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          mkdir -p release-artifacts
+          if [ -n "$UPLOAD_KEYSTORE_BASE64" ]; then
+            echo "Building signed Release APK using UPLOAD_KEYSTORE_BASE64..."
+            echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/my-upload-key.jks"
+            export KEYSTORE_PATH="$GITHUB_WORKSPACE/my-upload-key.jks"
+            gradle :app:assembleRelease --no-daemon --stacktrace
+            APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n1)
+            echo "build_type=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "UPLOAD_KEYSTORE_BASE64 not set; building signed Debug APK using debug.keystore.base64..."
+            if [ -f debug.keystore.base64 ]; then
+              base64 -d debug.keystore.base64 > "$GITHUB_WORKSPACE/debug.keystore"
+            fi
+            gradle :app:assembleDebug --no-daemon --stacktrace
+            APK_FILE=$(find app/build/outputs/apk/debug -name "*.apk" | head -n1)
+            echo "build_type=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "ERROR: APK output not found!"
+            exit 1
+          fi
+          cp "$APK_FILE" release-artifacts/brohi-ice-factory-latest.apk
+          ls -lh release-artifacts/brohi-ice-factory-latest.apk
+
+      - name: Generate version.json & Release Notes
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          MANUAL_NOTES: ${{ inputs.release_notes }}
+          MANDATORY_FLAG: ${{ inputs.mandatory }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime
+
+          notes = (os.environ.get("MANUAL_NOTES") or "").strip()
+          if not notes:
+              commit_lines = (os.environ.get("COMMIT_MSG") or "").strip().splitlines()
+              notes = commit_lines[0].strip() if commit_lines else "Latest Brohi Ice Factory updates and improvements."
+
+          mandatory = (os.environ.get("MANDATORY_FLAG") or "false").strip().lower() == "true"
+          vc = int(os.environ["VERSION_CODE"])
+          vn = os.environ["VERSION_NAME"]
+          tag = os.environ["TAG"]
+          repo = os.environ["REPO"]
+          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+
+          apk_url = f"https://github.com/{repo}/releases/download/{tag}/brohi-ice-factory-latest.apk"
+          payload = {
+              "latestVersionCode": vc,
+              "latestVersionName": vn,
+              "releaseNotes": notes,
+              "releaseNotesUrdu": f"نیا ورژن v{vn} (Build {vc}) GitHub سے دستیاب ہے — انسٹال کرنے کے لیے Update Now پر ٹیپ کریں۔",
+              "apkDownloadUrl": apk_url,
+              "mandatory": mandatory,
+              "publishedBy": "GitHub Auto-Release",
+              "publishedAtIso": today
+          }
+          with open("release-artifacts/version.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f, ensure_ascii=False, indent=2)
+
+          with open("release-artifacts/release_body.md", "w", encoding="utf-8") as f:
+              f.write(f"## Brohi Ice Factory v{vn} (Build {vc})\n\n")
+              f.write(f"- **What's New:** {notes}\n")
+              f.write(f"- **Direct APK Asset:** `brohi-ice-factory-latest.apk`\n")
+              f.write(f"- **Auto-Update Metadata:** `version.json`\n")
+          PY
+          cat release-artifacts/version.json
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Brohi Ice Factory v${{ steps.version.outputs.version_name }} (Build ${{ steps.version.outputs.version_code }})
+          body_path: release-artifacts/release_body.md
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/brohi-ice-factory-latest.apk
+            release-artifacts/version.json

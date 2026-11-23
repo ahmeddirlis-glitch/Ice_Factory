@@ -1,0 +1,881 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isStr(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptStr(data, key, maxLen) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isNum(val) {
+      return val is int || val is float;
+    }
+
+    function isNonNegNum(val) {
+      return isNum(val) && val >= 0;
+    }
+
+    function isValidTimestampsOnCreate(data) {
+      return data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidTimestampsOnUpdate(data, prev) {
+      return data.createdAt == prev.createdAt &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isBoundedUidList(list) {
+      return list is list && list.size() <= 50 && (list.size() == 0 || list[0] is string);
+    }
+
+    function isFactoryOwner(factoryId) {
+      return isSignedIn() && request.auth.uid == factoryId;
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function callerUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isApprovedMemberOf(factoryId) {
+      return isSignedIn() && (
+        request.auth.uid == factoryId || (
+          hasUserDoc() &&
+          callerUserDoc().approvalStatus == 'APPROVED' &&
+          callerUserDoc().linkedFactoryId == factoryId
+        )
+      );
+    }
+
+    function callerRole() {
+      return hasUserDoc() && ('requestedRole' in callerUserDoc()) ? callerUserDoc().requestedRole : '';
+    }
+
+    function isFactorySuperAdmin(factoryId) {
+      return isFactoryOwner(factoryId) || (
+        isApprovedMemberOf(factoryId) && callerRole() in ['Super Admin', 'Owner']
+      );
+    }
+
+    function isFactoryAdminOrSuper(factoryId) {
+      return isFactorySuperAdmin(factoryId) || (
+        isApprovedMemberOf(factoryId) && callerRole() == 'Admin'
+      );
+    }
+
+    function isFactoryManagerOrAbove(factoryId) {
+      return isFactoryAdminOrSuper(factoryId) || (
+        isApprovedMemberOf(factoryId) && callerRole() == 'Manager'
+      );
+    }
+
+    function isAnyApprovedSuperAdmin() {
+      return isSignedIn() && (
+        (
+          exists(/databases/$(database)/documents/factory_directory/primary) &&
+          get(/databases/$(database)/documents/factory_directory/primary).data.ownerId == request.auth.uid
+        ) ||
+        (
+          hasUserDoc() &&
+          callerUserDoc().approvalStatus == 'APPROVED' &&
+          callerRole() in ['Super Admin', 'Owner']
+        )
+      );
+    }
+
+    function canSelfClaimPrimarySuperAdmin() {
+      return !exists(/databases/$(database)/documents/factory_directory/primary) ||
+             get(/databases/$(database)/documents/factory_directory/primary).data.ownerId == request.auth.uid;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return isStr(data.userId, 1, 128) &&
+             isStr(data.displayName, 1, 120) &&
+             isOptStr(data, 'email', 200) &&
+             isOptStr(data, 'phone', 40) &&
+             isOptStr(data, 'photoUrl', 100000) &&
+             data.preferredLanguage in ['en', 'ur'] &&
+             data.darkMode is bool &&
+             isOptStr(data, 'approvalStatus', 30) &&
+             isOptStr(data, 'requestedRole', 40) &&
+             isOptStr(data, 'linkedFactoryId', 128) &&
+             (!('faceEnrolled' in data) || data.faceEnrolled is bool) &&
+             (!('approvedAtMillis' in data) || data.approvedAtMillis == null || (data.approvedAtMillis is int && data.approvedAtMillis >= 0));
+    }
+
+    function isValidFactoryDirectory(data) {
+      return isStr(data.ownerId, 1, 128) &&
+             isStr(data.companyName, 1, 120) &&
+             isStr(data.ownerName, 1, 120);
+    }
+
+    function isValidAppRelease(data) {
+      return data.latestVersionCode is int && data.latestVersionCode >= 1 &&
+             isStr(data.latestVersionName, 1, 40) &&
+             isOptStr(data, 'releaseNotes', 1000) &&
+             isOptStr(data, 'releaseNotesUrdu', 1000) &&
+             isOptStr(data, 'apkDownloadUrl', 1000) &&
+             (!('mandatory' in data) || data.mandatory is bool) &&
+             isOptStr(data, 'publishedBy', 120) &&
+             isOptStr(data, 'publishedAtIso', 40);
+    }
+
+    function isValidRegistrationRequest(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.applicantUid, 1, 128) &&
+             isStr(data.name, 1, 120) &&
+             isOptStr(data, 'fatherName', 120) &&
+             isStr(data.cnic, 0, 30) &&
+             isStr(data.phone, 0, 40) &&
+             isOptStr(data, 'whatsappNumber', 40) &&
+             isOptStr(data, 'email', 160) &&
+             isStr(data.emergencyContact, 0, 40) &&
+             data.requestedRole in ['Super Admin', 'Owner', 'Admin', 'Manager', 'Staff'] &&
+             isStr(data.shift, 1, 60) &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'] &&
+             (!('startingSalary' in data) || isNonNegNum(data.startingSalary)) &&
+             isOptStr(data, 'reviewNote', 300) &&
+             isOptStr(data, 'faceTemplateEncrypted', 8192);
+    }
+
+    function isValidProfileUpdateRequest(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.applicantUid, 1, 128) &&
+             isOptStr(data, 'employeeId', 128) &&
+             isStr(data.name, 1, 120) &&
+             isOptStr(data, 'fatherName', 120) &&
+             isStr(data.cnic, 0, 30) &&
+             isStr(data.phone, 0, 40) &&
+             isOptStr(data, 'whatsappNumber', 40) &&
+             isOptStr(data, 'email', 200) &&
+             isStr(data.emergencyContact, 0, 40) &&
+             isStr(data.shift, 1, 60) &&
+             isStr(data.joinDate, 0, 30) &&
+             isOptStr(data, 'photoUrl', 100000) &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'] &&
+             isOptStr(data, 'reviewNote', 300);
+    }
+
+    function isValidNotice(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.title, 1, 150) &&
+             isOptStr(data, 'titleUrdu', 200) &&
+             isStr(data.message, 1, 1000) &&
+             isOptStr(data, 'messageUrdu', 1000) &&
+             data.noticeType in ['Holiday', 'Urgent', 'Salary', 'General'] &&
+             isStr(data.date, 4, 30) &&
+             data.active is bool &&
+             isStr(data.createdByName, 1, 120);
+    }
+
+    function isValidEmployee(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isOptStr(data, 'authUid', 128) &&
+             isStr(data.name, 1, 120) &&
+             isOptStr(data, 'fatherName', 120) &&
+             isStr(data.phone, 0, 40) &&
+             isOptStr(data, 'whatsappNumber', 40) &&
+             isOptStr(data, 'email', 160) &&
+             isStr(data.cnic, 0, 30) &&
+             data.role in ['Super Admin', 'Owner', 'Admin', 'Manager', 'Staff'] &&
+             isNonNegNum(data.salary) &&
+             (!('initialSalary' in data) || isNonNegNum(data.initialSalary)) &&
+             isStr(data.shift, 1, 60) &&
+             isStr(data.joinDate, 1, 30) &&
+             isStr(data.emergencyContact, 0, 40) &&
+             data.skipLiveness is bool &&
+             isOptStr(data, 'faceTemplateEncrypted', 8192) &&
+             isOptStr(data, 'idCardPhoto', 100000) &&
+             isOptStr(data, 'attendanceFacePhoto', 100000) &&
+             data.active is bool;
+    }
+
+    function isValidAttendance(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.employeeId, 1, 128) &&
+             isStr(data.employeeName, 1, 120) &&
+             isStr(data.authUid, 1, 128) &&
+             isStr(data.date, 4, 30) &&
+             isStr(data.checkIn, 0, 30) &&
+             isStr(data.checkOut, 0, 30) &&
+             data.status in ['Present', 'Absent', 'Leave', 'Checked Out'] &&
+             data.bypassed is bool &&
+             isNonNegNum(data.hours) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidProduction(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.date, 4, 30) &&
+             isNonNegNum(data.tons) &&
+             isStr(data.productType, 1, 80) &&
+             isStr(data.machineId, 0, 128) &&
+             isStr(data.machineName, 1, 100) &&
+             isOptStr(data, 'notes', 500) &&
+             isStr(data.createdBy, 1, 128) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidInventory(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.product, 1, 80) &&
+             isNonNegNum(data.tons) &&
+             isStr(data.location, 1, 80) &&
+             data.movementType in ['IN', 'OUT', 'ADJUST'] &&
+             isOptStr(data, 'notes', 500) &&
+             isStr(data.createdBy, 1, 128) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidCustomer(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.name, 1, 120) &&
+             isStr(data.phone, 0, 40) &&
+             isOptStr(data, 'address', 300) &&
+             isNonNegNum(data.balance) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidSale(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.invoiceNumber, 1, 60) &&
+             isStr(data.customerId, 0, 128) &&
+             isStr(data.customerName, 1, 120) &&
+             isStr(data.product, 1, 80) &&
+             data.quantity is int && data.quantity >= 1 &&
+             isNonNegNum(data.unitPrice) &&
+             isNonNegNum(data.total) &&
+             data.paid is bool &&
+             isNonNegNum(data.paidAmount) &&
+             isStr(data.date, 4, 30) &&
+             isStr(data.createdBy, 1, 128) &&
+             data.source in ['manual', 'voice'] &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidExpense(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.description, 1, 300) &&
+             isNonNegNum(data.amount) &&
+             data.category in ['Electricity', 'Rent', 'Diesel', 'Water', 'Salary', 'Refreshment', 'Maintenance', 'Supplier', 'Other', 'Factory Build'] &&
+             data.capitalInvestment is bool &&
+             (data.category != 'Factory Build' || data.capitalInvestment == true) &&
+             isStr(data.date, 4, 30) &&
+             isStr(data.createdBy, 1, 128) &&
+             data.source in ['manual', 'voice'] &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidFunding(data, factoryId) {
+      return data.ownerId == factoryId &&
+             data.source in ['Friend', 'Bank', 'Investor', 'Customer'] &&
+             isStr(data.name, 1, 120) &&
+             data.type in ['Loan', 'Investment'] &&
+             isNonNegNum(data.amount) &&
+             isNonNegNum(data.repaid) &&
+             isNonNegNum(data.interest) &&
+             isOptStr(data, 'dueDate', 30) &&
+             isStr(data.date, 4, 30) &&
+             isOptStr(data, 'notes', 500);
+    }
+
+    function isValidPayroll(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.employeeId, 1, 128) &&
+             isOptStr(data, 'authUid', 128) &&
+             isStr(data.employeeName, 1, 120) &&
+             isStr(data.month, 3, 30) &&
+             isNonNegNum(data.baseSalary) &&
+             isNonNegNum(data.advances) &&
+             isNonNegNum(data.deductions) &&
+             isNonNegNum(data.netPay) &&
+             data.paid is bool &&
+             isOptStr(data, 'paidDate', 30);
+    }
+
+    function isValidUtility(data, factoryId) {
+      return data.ownerId == factoryId &&
+             data.type in ['Electricity', 'Diesel', 'Water'] &&
+             isNonNegNum(data.meterReading) &&
+             isNonNegNum(data.unitsOrLiters) &&
+             isNonNegNum(data.amount) &&
+             isStr(data.date, 4, 30) &&
+             isOptStr(data, 'notes', 500) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidDelivery(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.vehicleNumber, 1, 40) &&
+             isStr(data.driverName, 1, 120) &&
+             isStr(data.route, 1, 150) &&
+             isStr(data.customerName, 1, 120) &&
+             isNonNegNum(data.tons) &&
+             data.status in ['Idle', 'Loading', 'On route', 'Delivered'] &&
+             isStr(data.date, 4, 30) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidMachine(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.name, 1, 120) &&
+             isStr(data.model, 0, 80) &&
+             isNonNegNum(data.capacityTonsPerDay) &&
+             isStr(data.lastServicedDate, 0, 30) &&
+             isStr(data.nextServiceDate, 0, 30) &&
+             data.status in ['Operational', 'Needs Service', 'Maintenance Due', 'Breakdown'] &&
+             isOptStr(data, 'breakdownNote', 500) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidSupplier(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.name, 1, 120) &&
+             isStr(data.phone, 0, 40) &&
+             isStr(data.itemSupplied, 1, 120) &&
+             isNonNegNum(data.totalPurchases) &&
+             isNonNegNum(data.dues) &&
+             isOptStr(data, 'lastPaymentDate', 30) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidIncident(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.title, 1, 150) &&
+             isStr(data.description, 1, 1000) &&
+             data.severity in ['Low', 'Medium', 'High'] &&
+             data.status in ['Open', 'In Progress', 'Investigating', 'Resolved'] &&
+             isOptStr(data, 'followUp', 500) &&
+             isStr(data.reportedBy, 1, 120) &&
+             isStr(data.date, 4, 30) &&
+             isBoundedUidList(data.memberUids);
+    }
+
+    function isValidSettings(data, factoryId) {
+      return data.ownerId == factoryId &&
+             isStr(data.companyName, 1, 120) &&
+             isStr(data.phone, 0, 40) &&
+             isStr(data.address, 0, 300) &&
+             isNonNegNum(data.iceBlockRate) &&
+             isNonNegNum(data.iceCubeRate) &&
+             isStr(data.operationsStartDate, 4, 30) &&
+             data.notificationsEnabled is bool &&
+             data.seededDemo is bool;
+    }
+
+    // --- Top-Level Collection Rules ---
+
+    // Primary factory lookup directory for linking Staff/Manager/Admin/Super Admin accounts
+    match /factory_directory/{directoryId} {
+      allow get: if isSignedIn() && directoryId == 'primary';
+      allow list: if false;
+      allow create: if isSignedIn() && directoryId == 'primary' &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().keys().hasAll(['ownerId', 'companyName', 'ownerName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'companyName', 'ownerName', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidFactoryDirectory(incoming());
+      allow update: if isFactoryOwner(existing().ownerId) && directoryId == 'primary' &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidFactoryDirectory(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['companyName', 'ownerName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Live App Releases: Readable by ALL signed-in roles (Staff, Manager, Admin, Super Admin); published by Super Admin
+    match /app_releases/{releaseId} {
+      allow get: if isSignedIn() && isValidId(releaseId);
+      allow list: if isSignedIn();
+      allow create: if isAnyApprovedSuperAdmin() && releaseId == 'latest' &&
+                       incoming().keys().hasAll(['latestVersionCode', 'latestVersionName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['latestVersionCode', 'latestVersionName', 'releaseNotes', 'releaseNotesUrdu', 'apkDownloadUrl', 'mandatory', 'publishedBy', 'publishedAtIso', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidAppRelease(incoming());
+      allow update: if isAnyApprovedSuperAdmin() && releaseId == 'latest' &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidAppRelease(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['latestVersionCode', 'latestVersionName', 'releaseNotes', 'releaseNotesUrdu', 'apkDownloadUrl', 'mandatory', 'publishedBy', 'publishedAtIso', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) &&
+                    (request.auth.uid == userId ||
+                     (('linkedFactoryId' in existing()) && isFactoryAdminOrSuper(existing().linkedFactoryId)));
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'preferredLanguage', 'darkMode', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'phone', 'photoUrl', 'preferredLanguage', 'darkMode', 'approvalStatus', 'requestedRole', 'linkedFactoryId', 'faceEnrolled', 'approvedAtMillis', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidUserProfile(incoming()) &&
+                       (
+                         incoming().approvalStatus == 'PENDING' ||
+                         (incoming().approvalStatus == 'APPROVED' && canSelfClaimPrimarySuperAdmin())
+                       );
+      allow update: if isSignedIn() && isValidId(userId) &&
+                       incoming().userId == existing().userId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidUserProfile(incoming()) &&
+                       (
+                         (
+                           request.auth.uid == userId &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phone', 'photoUrl', 'preferredLanguage', 'darkMode', 'approvalStatus', 'requestedRole', 'linkedFactoryId', 'faceEnrolled', 'approvedAtMillis', 'updatedAt']) &&
+                           (
+                             (incoming().approvalStatus == existing().approvalStatus && incoming().requestedRole == existing().requestedRole) ||
+                             incoming().approvalStatus == 'PENDING' ||
+                             canSelfClaimPrimarySuperAdmin()
+                           )
+                         ) ||
+                         (
+                           (
+                             (('linkedFactoryId' in incoming()) && incoming().linkedFactoryId != null && isFactoryAdminOrSuper(incoming().linkedFactoryId)) ||
+                             (('linkedFactoryId' in existing()) && existing().linkedFactoryId != null && isFactoryAdminOrSuper(existing().linkedFactoryId))
+                           ) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phone', 'photoUrl', 'approvalStatus', 'requestedRole', 'linkedFactoryId', 'faceEnrolled', 'approvedAtMillis', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+    }
+
+    // Registration Requests: Applicants submit PENDING requests; Factory Super Admin / Admin approves, edits, rejects, deletes
+    match /factories/{factoryId}/registration_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId) &&
+                    (isFactoryAdminOrSuper(factoryId) || requestId == request.auth.uid || existing().applicantUid == request.auth.uid);
+      allow list: if isSignedIn() &&
+                    (isFactoryAdminOrSuper(factoryId) || resource.data.applicantUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(requestId) &&
+                       (isFactoryAdminOrSuper(factoryId) || (incoming().applicantUid == request.auth.uid && incoming().status == 'PENDING')) &&
+                       incoming().keys().hasAll(['ownerId', 'applicantUid', 'name', 'cnic', 'phone', 'requestedRole', 'shift', 'status', 'emergencyContact', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'applicantUid', 'name', 'fatherName', 'cnic', 'phone', 'whatsappNumber', 'email', 'emergencyContact', 'requestedRole', 'shift', 'status', 'startingSalary', 'reviewNote', 'faceTemplateEncrypted', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidRegistrationRequest(incoming(), factoryId);
+      allow update: if isSignedIn() && isValidId(requestId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().applicantUid == existing().applicantUid &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidRegistrationRequest(incoming(), factoryId) &&
+                       (
+                         (
+                           isFactoryAdminOrSuper(factoryId) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'fatherName', 'cnic', 'phone', 'whatsappNumber', 'email', 'emergencyContact', 'requestedRole', 'shift', 'status', 'startingSalary', 'reviewNote', 'faceTemplateEncrypted', 'updatedAt']) &&
+                           (!(incoming().requestedRole in ['Super Admin', 'Owner']) || incoming().status != 'APPROVED' || isFactorySuperAdmin(factoryId))
+                         ) ||
+                         (
+                           (requestId == request.auth.uid || existing().applicantUid == request.auth.uid) &&
+                           incoming().status == 'PENDING' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'fatherName', 'cnic', 'phone', 'whatsappNumber', 'email', 'emergencyContact', 'requestedRole', 'shift', 'status', 'reviewNote', 'faceTemplateEncrypted', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(requestId);
+    }
+
+    // Profile Update Requests: Approved members submit PENDING updates (no role/salary fields); Super Admin / Admin approve or reject
+    match /factories/{factoryId}/profile_update_requests/{requestId} {
+      allow get: if isValidId(requestId) &&
+                    (isFactoryAdminOrSuper(factoryId) || (isApprovedMemberOf(factoryId) && (requestId == request.auth.uid || existing().applicantUid == request.auth.uid)));
+      allow list: if isFactoryAdminOrSuper(factoryId) ||
+                    (isApprovedMemberOf(factoryId) && resource.data.applicantUid == request.auth.uid);
+      allow create: if isApprovedMemberOf(factoryId) && isValidId(requestId) &&
+                       incoming().applicantUid == request.auth.uid &&
+                       incoming().status == 'PENDING' &&
+                       incoming().keys().hasAll(['ownerId', 'applicantUid', 'name', 'cnic', 'phone', 'shift', 'joinDate', 'emergencyContact', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'applicantUid', 'employeeId', 'name', 'fatherName', 'cnic', 'phone', 'whatsappNumber', 'email', 'emergencyContact', 'shift', 'joinDate', 'photoUrl', 'status', 'reviewNote', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidProfileUpdateRequest(incoming(), factoryId);
+      allow update: if isValidId(requestId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().applicantUid == existing().applicantUid &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidProfileUpdateRequest(incoming(), factoryId) &&
+                       (
+                         (
+                           isFactoryAdminOrSuper(factoryId) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewNote', 'updatedAt'])
+                         ) ||
+                         (
+                           isApprovedMemberOf(factoryId) &&
+                           (requestId == request.auth.uid || existing().applicantUid == request.auth.uid) &&
+                           incoming().status == 'PENDING' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['employeeId', 'name', 'fatherName', 'cnic', 'phone', 'whatsappNumber', 'email', 'emergencyContact', 'shift', 'joinDate', 'photoUrl', 'status', 'reviewNote', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(requestId);
+    }
+
+    // Factory Notices & Holiday Broadcasts: Readable by approved factory members (and factoryId owner); managed by Admin/Super Admin
+    match /factories/{factoryId}/notices/{noticeId} {
+      allow get: if isApprovedMemberOf(factoryId) && isValidId(noticeId);
+      allow list: if isApprovedMemberOf(factoryId);
+      allow create: if isFactoryAdminOrSuper(factoryId) && isValidId(noticeId) &&
+                       incoming().keys().hasAll(['ownerId', 'title', 'message', 'noticeType', 'date', 'active', 'createdByName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'title', 'titleUrdu', 'message', 'messageUrdu', 'noticeType', 'date', 'active', 'createdByName', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidNotice(incoming(), factoryId);
+      allow update: if isFactoryAdminOrSuper(factoryId) && isValidId(noticeId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidNotice(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'titleUrdu', 'message', 'messageUrdu', 'noticeType', 'date', 'active', 'createdByName', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(noticeId);
+    }
+
+    // Employees: Admin & Super Admin see/manage all; approved Staff can read only their own profile
+    match /factories/{factoryId}/employees/{employeeId} {
+      allow get: if isValidId(employeeId) &&
+                    (isFactoryAdminOrSuper(factoryId) || (isApprovedMemberOf(factoryId) && existing().authUid == request.auth.uid));
+      allow list: if isFactoryAdminOrSuper(factoryId) ||
+                    (isApprovedMemberOf(factoryId) && resource.data.authUid == request.auth.uid);
+      allow create: if isFactoryAdminOrSuper(factoryId) && isValidId(employeeId) &&
+                       incoming().keys().hasAll(['ownerId', 'name', 'phone', 'cnic', 'role', 'salary', 'shift', 'joinDate', 'emergencyContact', 'skipLiveness', 'active', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'authUid', 'name', 'fatherName', 'phone', 'whatsappNumber', 'email', 'cnic', 'role', 'salary', 'initialSalary', 'shift', 'joinDate', 'emergencyContact', 'skipLiveness', 'faceTemplateEncrypted', 'idCardPhoto', 'attendanceFacePhoto', 'active', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidEmployee(incoming(), factoryId);
+      allow update: if isValidId(employeeId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidEmployee(incoming(), factoryId) &&
+                       (
+                         (
+                           isFactoryAdminOrSuper(factoryId) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['authUid', 'name', 'fatherName', 'phone', 'whatsappNumber', 'email', 'cnic', 'role', 'salary', 'initialSalary', 'shift', 'joinDate', 'emergencyContact', 'skipLiveness', 'faceTemplateEncrypted', 'idCardPhoto', 'attendanceFacePhoto', 'active', 'updatedAt'])
+                         ) ||
+                         (
+                           isApprovedMemberOf(factoryId) &&
+                           existing().authUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['faceTemplateEncrypted', 'idCardPhoto', 'attendanceFacePhoto', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(employeeId);
+    }
+
+    // Attendance: Manager/Admin/Super Admin see all; staff can read/write only their own attendance
+    match /factories/{factoryId}/attendance/{attendanceId} {
+      allow get: if isValidId(attendanceId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isApprovedMemberOf(factoryId) && existing().authUid == request.auth.uid) || (isSignedIn() && request.auth.uid in existing().memberUids && existing().authUid == request.auth.uid));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isApprovedMemberOf(factoryId) && resource.data.authUid == request.auth.uid) ||
+                    (isSignedIn() && resource.data.authUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(attendanceId) &&
+                       (isFactoryAdminOrSuper(factoryId) || (isApprovedMemberOf(factoryId) && incoming().authUid == request.auth.uid)) &&
+                       incoming().keys().hasAll(['ownerId', 'employeeId', 'employeeName', 'authUid', 'date', 'checkIn', 'checkOut', 'status', 'bypassed', 'hours', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'employeeId', 'employeeName', 'authUid', 'date', 'checkIn', 'checkOut', 'status', 'bypassed', 'hours', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidAttendance(incoming(), factoryId);
+      allow update: if isSignedIn() && isValidId(attendanceId) &&
+                       (isFactoryAdminOrSuper(factoryId) || (isApprovedMemberOf(factoryId) && existing().authUid == request.auth.uid)) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().authUid == existing().authUid &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidAttendance(incoming(), factoryId) &&
+                       (
+                         (isFactoryAdminOrSuper(factoryId) && incoming().diff(existing()).affectedKeys().hasOnly(['employeeId', 'employeeName', 'date', 'checkIn', 'checkOut', 'status', 'bypassed', 'hours', 'updatedAt'])) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['checkOut', 'status', 'hours', 'updatedAt'])
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(attendanceId);
+    }
+
+    // Production
+    match /factories/{factoryId}/production/{productionId} {
+      allow get: if isValidId(productionId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(productionId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'date', 'tons', 'productType', 'machineId', 'machineName', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'date', 'tons', 'productType', 'machineId', 'machineName', 'notes', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidProduction(incoming(), factoryId);
+      allow update: if isFactoryAdminOrSuper(factoryId) && isValidId(productionId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidProduction(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['date', 'tons', 'productType', 'machineId', 'machineName', 'notes', 'memberUids', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(productionId);
+    }
+
+    // Inventory & Cold Storage
+    match /factories/{factoryId}/inventory/{inventoryId} {
+      allow get: if isValidId(inventoryId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(inventoryId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'product', 'tons', 'location', 'movementType', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'product', 'tons', 'location', 'movementType', 'notes', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidInventory(incoming(), factoryId);
+      allow update: if isFactoryAdminOrSuper(factoryId) && isValidId(inventoryId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidInventory(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['product', 'tons', 'location', 'movementType', 'notes', 'memberUids', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(inventoryId);
+    }
+
+    // Customers & Credit
+    match /factories/{factoryId}/customers/{customerId} {
+      allow get: if isValidId(customerId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(customerId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'name', 'phone', 'balance', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'name', 'phone', 'address', 'balance', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidCustomer(incoming(), factoryId);
+      allow update: if isValidId(customerId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidCustomer(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'address', 'balance', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(customerId);
+    }
+
+    // Sales & Invoicing
+    match /factories/{factoryId}/sales/{saleId} {
+      allow get: if isValidId(saleId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(saleId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'invoiceNumber', 'customerId', 'customerName', 'product', 'quantity', 'unitPrice', 'total', 'paid', 'paidAmount', 'date', 'createdBy', 'source', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'invoiceNumber', 'customerId', 'customerName', 'product', 'quantity', 'unitPrice', 'total', 'paid', 'paidAmount', 'date', 'createdBy', 'source', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidSale(incoming(), factoryId);
+      allow update: if isValidId(saleId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidSale(incoming(), factoryId) &&
+                       (
+                         (isFactoryAdminOrSuper(factoryId) && incoming().diff(existing()).affectedKeys().hasOnly(['customerId', 'customerName', 'product', 'quantity', 'unitPrice', 'total', 'paid', 'paidAmount', 'date', 'updatedAt'])) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['paid', 'paidAmount', 'updatedAt'])
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(saleId);
+    }
+
+    // Expenses (Factory Build capital investments hidden from non-Super-Admins)
+    match /factories/{factoryId}/expenses/{expenseId} {
+      allow get: if isValidId(expenseId) && (
+                    isFactorySuperAdmin(factoryId) ||
+                    ((isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) && existing().capitalInvestment == false)
+                  );
+      allow list: if isFactorySuperAdmin(factoryId) ||
+                    ((isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in resource.data.memberUids)) && resource.data.capitalInvestment == false);
+      allow create: if isValidId(expenseId) && (
+                       isFactorySuperAdmin(factoryId) ||
+                       ((isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) && incoming().capitalInvestment == false)
+                     ) &&
+                     incoming().keys().hasAll(['ownerId', 'description', 'amount', 'category', 'capitalInvestment', 'date', 'createdBy', 'source', 'memberUids', 'createdAt', 'updatedAt']) &&
+                     incoming().keys().hasOnly(['ownerId', 'description', 'amount', 'category', 'capitalInvestment', 'date', 'createdBy', 'source', 'memberUids', 'createdAt', 'updatedAt']) &&
+                     isValidTimestampsOnCreate(incoming()) &&
+                     isValidExpense(incoming(), factoryId);
+      allow update: if isValidId(expenseId) &&
+                       (isFactorySuperAdmin(factoryId) || (isFactoryAdminOrSuper(factoryId) && existing().capitalInvestment == false && incoming().capitalInvestment == false)) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidExpense(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['description', 'amount', 'category', 'capitalInvestment', 'date', 'updatedAt']);
+      allow delete: if isValidId(expenseId) &&
+                       (isFactorySuperAdmin(factoryId) || (isFactoryAdminOrSuper(factoryId) && existing().capitalInvestment == false));
+    }
+
+    // Super Admin only: Funding & Loans
+    match /factories/{factoryId}/funding/{fundingId} {
+      allow get: if isFactorySuperAdmin(factoryId) && isValidId(fundingId);
+      allow list: if isFactorySuperAdmin(factoryId);
+      allow create: if isFactorySuperAdmin(factoryId) && isValidId(fundingId) &&
+                       incoming().keys().hasAll(['ownerId', 'source', 'name', 'type', 'amount', 'repaid', 'interest', 'date', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'source', 'name', 'type', 'amount', 'repaid', 'interest', 'dueDate', 'date', 'notes', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidFunding(incoming(), factoryId);
+      allow update: if isFactorySuperAdmin(factoryId) && isValidId(fundingId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidFunding(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['source', 'name', 'type', 'amount', 'repaid', 'interest', 'dueDate', 'date', 'notes', 'updatedAt']);
+      allow delete: if isFactorySuperAdmin(factoryId) && isValidId(fundingId);
+    }
+
+    // Salary & Payroll: Super Admin sees/edits all; Staff can read ONLY their own payroll slips
+    match /factories/{factoryId}/payroll/{payrollId} {
+      allow get: if isValidId(payrollId) && (
+                    isFactorySuperAdmin(factoryId) ||
+                    (isApprovedMemberOf(factoryId) && ('authUid' in existing()) && existing().authUid == request.auth.uid)
+                  );
+      allow list: if isFactorySuperAdmin(factoryId) ||
+                    (isApprovedMemberOf(factoryId) && ('authUid' in resource.data) && resource.data.authUid == request.auth.uid);
+      allow create: if isFactorySuperAdmin(factoryId) && isValidId(payrollId) &&
+                       incoming().keys().hasAll(['ownerId', 'employeeId', 'employeeName', 'month', 'baseSalary', 'advances', 'deductions', 'netPay', 'paid', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'employeeId', 'authUid', 'employeeName', 'month', 'baseSalary', 'advances', 'deductions', 'netPay', 'paid', 'paidDate', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidPayroll(incoming(), factoryId);
+      allow update: if isFactorySuperAdmin(factoryId) && isValidId(payrollId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidPayroll(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['authUid', 'baseSalary', 'advances', 'deductions', 'netPay', 'paid', 'paidDate', 'updatedAt']);
+      allow delete: if isFactorySuperAdmin(factoryId) && isValidId(payrollId);
+    }
+
+    // Utilities (Electricity / Diesel / Water)
+    match /factories/{factoryId}/utilities/{utilityId} {
+      allow get: if isValidId(utilityId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(utilityId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'type', 'meterReading', 'unitsOrLiters', 'amount', 'date', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'type', 'meterReading', 'unitsOrLiters', 'amount', 'date', 'notes', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidUtility(incoming(), factoryId);
+      allow update: if isFactoryAdminOrSuper(factoryId) && isValidId(utilityId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidUtility(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['meterReading', 'unitsOrLiters', 'amount', 'notes', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(utilityId);
+    }
+
+    // Deliveries & Vehicles
+    match /factories/{factoryId}/deliveries/{deliveryId} {
+      allow get: if isValidId(deliveryId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(deliveryId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'vehicleNumber', 'driverName', 'route', 'customerName', 'tons', 'status', 'date', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'vehicleNumber', 'driverName', 'route', 'customerName', 'tons', 'status', 'date', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidDelivery(incoming(), factoryId);
+      allow update: if isValidId(deliveryId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidDelivery(incoming(), factoryId) &&
+                       (
+                         (isFactoryAdminOrSuper(factoryId) && incoming().diff(existing()).affectedKeys().hasOnly(['vehicleNumber', 'driverName', 'route', 'customerName', 'tons', 'status', 'date', 'updatedAt'])) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'route', 'driverName', 'updatedAt'])
+                       );
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(deliveryId);
+    }
+
+    // Machine Maintenance
+    match /factories/{factoryId}/machines/{machineId} {
+      allow get: if isValidId(machineId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(machineId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'name', 'model', 'capacityTonsPerDay', 'lastServicedDate', 'nextServiceDate', 'status', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'name', 'model', 'capacityTonsPerDay', 'lastServicedDate', 'nextServiceDate', 'status', 'breakdownNote', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidMachine(incoming(), factoryId);
+      allow update: if isFactoryAdminOrSuper(factoryId) && isValidId(machineId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidMachine(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'model', 'capacityTonsPerDay', 'lastServicedDate', 'nextServiceDate', 'status', 'breakdownNote', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(machineId);
+    }
+
+    // Suppliers
+    match /factories/{factoryId}/suppliers/{supplierId} {
+      allow get: if isValidId(supplierId) &&
+                    (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isFactoryManagerOrAbove(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(supplierId) &&
+                       (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'name', 'phone', 'itemSupplied', 'totalPurchases', 'dues', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'name', 'phone', 'itemSupplied', 'totalPurchases', 'dues', 'lastPaymentDate', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidSupplier(incoming(), factoryId);
+      allow update: if (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) && isValidId(supplierId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidSupplier(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'itemSupplied', 'totalPurchases', 'dues', 'lastPaymentDate', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(supplierId);
+    }
+
+    // Safety Incidents (Staff & Management can read/report incidents)
+    match /factories/{factoryId}/incidents/{incidentId} {
+      allow get: if isValidId(incidentId) &&
+                    (isApprovedMemberOf(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids));
+      allow list: if isApprovedMemberOf(factoryId) ||
+                    (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow create: if isValidId(incidentId) &&
+                       (isApprovedMemberOf(factoryId) || (isSignedIn() && request.auth.uid in incoming().memberUids)) &&
+                       incoming().keys().hasAll(['ownerId', 'title', 'description', 'severity', 'status', 'reportedBy', 'date', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'title', 'description', 'severity', 'status', 'followUp', 'reportedBy', 'date', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidIncident(incoming(), factoryId);
+      allow update: if (isFactoryManagerOrAbove(factoryId) || (isSignedIn() && request.auth.uid in existing().memberUids)) && isValidId(incidentId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidIncident(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'severity', 'status', 'followUp', 'updatedAt']);
+      allow delete: if isFactoryAdminOrSuper(factoryId) && isValidId(incidentId);
+    }
+
+    // Factory Settings (Readable by approved members for company info & rates; writable by Super Admin)
+    match /factories/{factoryId}/settings/{settingId} {
+      allow get: if isApprovedMemberOf(factoryId) && isValidId(settingId);
+      allow list: if isApprovedMemberOf(factoryId);
+      allow create: if isFactorySuperAdmin(factoryId) && isValidId(settingId) &&
+                       incoming().keys().hasAll(['ownerId', 'companyName', 'phone', 'address', 'iceBlockRate', 'iceCubeRate', 'operationsStartDate', 'notificationsEnabled', 'seededDemo', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'companyName', 'phone', 'address', 'iceBlockRate', 'iceCubeRate', 'operationsStartDate', 'notificationsEnabled', 'seededDemo', 'createdAt', 'updatedAt']) &&
+                       isValidTimestampsOnCreate(incoming()) &&
+                       isValidSettings(incoming(), factoryId);
+      allow update: if isFactorySuperAdmin(factoryId) && isValidId(settingId) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isValidTimestampsOnUpdate(incoming(), existing()) &&
+                       isValidSettings(incoming(), factoryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['companyName', 'phone', 'address', 'iceBlockRate', 'iceCubeRate', 'operationsStartDate', 'notificationsEnabled', 'seededDemo', 'updatedAt']);
+      allow delete: if isFactorySuperAdmin(factoryId) && isValidId(settingId);
+    }
+  }
+}
