@@ -118,6 +118,7 @@ import com.example.ui.components.CnicCrystalTextField
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalFullPhotoViewerDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyGlossyButton
 import com.example.ui.components.ModernRoleSelectorCardGrid
 import com.example.ui.components.ModernShiftSelector
 import com.example.ui.components.PhoneCrystalTextField
@@ -1261,16 +1262,12 @@ fun UserProfileScreen(
             }
         }
 
-        Button(
+        IcyGlossyButton(
             onClick = { showEditDialog = true },
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(PrimaryBlueGradient)
+                .heightIn(min = 50.dp)
                 .testTag("edit_profile_button")
         ) {
             Icon(Icons.Filled.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))

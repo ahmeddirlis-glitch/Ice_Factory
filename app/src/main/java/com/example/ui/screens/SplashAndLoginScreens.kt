@@ -127,6 +127,8 @@ import com.example.ui.components.CnicCrystalTextField
 import com.example.ui.components.CrystalBackground
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyTone
 import com.example.ui.components.ModernRoleSelectorCardGrid
 import com.example.ui.components.ModernShiftSelector
 import com.example.ui.components.PhoneCrystalTextField
@@ -554,17 +556,13 @@ fun LoginScreen(
                         )
                     }
 
-                    Button(
+                    IcyGlossyButton(
                         onClick = { onGoogleSignInClick(emailOrPhone.trim()) },
                         enabled = !isSigningIn,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 52.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(PrimaryBlueGradient)
                             .testTag("login_primary_button")
                     ) {
                         if (isSigningIn) {
@@ -1127,19 +1125,19 @@ fun LoginScreen(
                                             color = DeepBlue,
                                             lineHeight = 16.sp
                                         )
-                                        Button(
+                                        IcyGlossyButton(
                                             onClick = { showGuidedFaceDialog = true },
-                                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(46.dp)
+                                                .height(48.dp)
                                                 .testTag("open_registration_camera_button")
                                         ) {
-                                            Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(17.dp))
+                                            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 "Start 4-Pose Face Scan (چہرہ اسکین کریں)",
+                                                color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
                                             )
@@ -1208,51 +1206,51 @@ fun LoginScreen(
                         ) {
                             Text("Cancel", maxLines = 1, softWrap = false)
                         }
-                        Button(
+                        IcyGlossyButton(
                             onClick = {
                                 triedSubmit = true
                                 if (name.isBlank()) {
                                     formError = "Please enter Full Name (پورا نام لکھیں)"
                                     popupTitle = "Full Name Required (نام ضروری ہے)"
                                     popupMessage = formError
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (cnicDigits.isNotEmpty() && !PakistaniFormatters.isValidCnic(cnicDigits)) {
                                     formError = "CNIC is not complete. Please enter 13 digits (e.g. 44204-1253835-5)."
                                     popupTitle = "CNIC Number Not Complete"
                                     popupMessage = "CNIC number is not complete. Please enter all 13 digits (e.g. 44204-1253835-5).\n\nشناختی کارڈ نمبر مکمل نہیں ہے، براہ کرم 13 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (!PakistaniFormatters.isValidPhone(phoneDigits)) {
                                     formError = "Mobile Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "Mobile number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nموبائل نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں (مثلاً 0333-2828285)۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (whatsappDigits.isNotEmpty() && !PakistaniFormatters.isValidPhone(whatsappDigits)) {
                                     formError = "WhatsApp Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "WhatsApp number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nواٹس ایپ نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (emergencyDigits.isNotEmpty() && !PakistaniFormatters.isValidPhone(emergencyDigits)) {
                                     formError = "Emergency Contact Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "Emergency contact number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nہنگامی نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (emergencyMatchesPrimary) {
                                     formError = "Emergency contact cannot be same as Mobile or WhatsApp number."
                                     popupTitle = "Different Emergency Number Required"
                                     popupMessage = "Emergency contact number cannot be the same as Mobile or WhatsApp number. Please enter a different family or alternate number.\n\nہنگامی رابطہ نمبر موبائل یا واٹس ایپ جیسا نہیں ہو سکتا، براہ کرم کوئی دوسرا نمبر درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (capturedFaceEncrypted.isNullOrBlank()) {
                                     formError = "Please scan your face with camera first. (براہ کرم پہلے کیمرہ سے چہرہ اسکین کریں تاکہ بعد میں صرف آپ ہی حاضری لگا سکیں۔)"
                                     popupTitle = "Face Registration Required (چہرہ اسکین لازمی ہے)"
                                     popupMessage = "Biometric 4-pose face registration is mandatory so that proxy attendance is strictly prevented and only the original person can mark their attendance.\n\nرجسٹریشن کے لیے 4 زاویوں سے چہرہ اسکین کرنا لازمی ہے تاکہ صرف اصل ملازم ہی حاضری لگا سکے۔"
                                     showGuidedFaceDialog = true
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 val payload = JSONObject().apply {
                                     put("name", PakistaniFormatters.formatTitleCase(name))
@@ -1269,14 +1267,10 @@ fun LoginScreen(
                                 showRegisterSheet = false
                                 onSubmitRegistrationAndSignIn(payload, email.trim())
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            contentPadding = PaddingValues(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                             modifier = Modifier
                                 .weight(0.65f)
                                 .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PrimaryBlueGradient)
                                 .testTag("submit_registration_button")
                         ) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -1505,13 +1499,11 @@ fun WaitingForApprovalGateScreen(
                         }
                     }
 
-                    Button(
+                    IcyGlossyButton(
                         onClick = onRefreshStatus,
-                        colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(50.dp)
                             .testTag("gate_refresh_approval_button")
                     ) {
                         Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -1699,18 +1691,16 @@ fun WaitingForApprovalGateScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Button(
+                        IcyGlossyButton(
                             onClick = { showGateFaceDialog = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (!gateFaceEncrypted.isNullOrBlank()) SuccessGreen else RoyalBlue
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            tone = if (!gateFaceEncrypted.isNullOrBlank()) IcyGlossyTone.GREEN else IcyGlossyTone.BLUE,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                         ) {
-                            Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (!gateFaceEncrypted.isNullOrBlank()) "Re-scan" else "Scan Face",
+                                color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1732,7 +1722,7 @@ fun WaitingForApprovalGateScreen(
                 if (!gateFormError.isNullOrBlank()) {
                     Text(gateFormError!!, color = DangerRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Button(
+                IcyGlossyButton(
                     onClick = {
                         triedSubmit = true
                         when {
@@ -1768,8 +1758,6 @@ fun WaitingForApprovalGateScreen(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
                     Text("Submit for Approval (منظوری کے لیے بھیجیں)", color = Color.White, fontWeight = FontWeight.Bold)

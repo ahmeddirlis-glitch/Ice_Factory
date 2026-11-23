@@ -79,6 +79,7 @@ import com.example.data.util.PakistaniFormatters
 import com.example.data.util.StatementDocumentModel
 import com.example.data.util.StatementFilterGroup
 import com.example.data.util.StatementKind
+import com.example.ui.components.IcyGlossyButton
 import com.example.ui.theme.CrystalBorderLight
 import com.example.ui.theme.DangerRed
 import com.example.ui.theme.DeepBlue
@@ -389,19 +390,17 @@ fun SalesInvoicePreviewDialog(
                         }
                     }
 
-                    Button(
+                    IcyGlossyButton(
                         onClick = onExportPdf,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DocNavyMid),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 46.dp)
                             .testTag("export_invoice_pdf_button")
                     ) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Share / PDF", fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1)
+                        Text("Share / PDF", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1)
                     }
                 }
             }
@@ -757,19 +756,17 @@ fun FinancialAndCreditStatementDialog(
                         Text("Close", fontWeight = FontWeight.Bold, color = DeepBlue, fontSize = 12.5.sp)
                     }
 
-                    Button(
+                    IcyGlossyButton(
                         onClick = onExportPdf,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DocNavyMid),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 46.dp)
                             .testTag("export_statement_pdf_button")
                     ) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Export Statement PDF", fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1)
+                        Text("Export Statement PDF", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1)
                     }
                 }
             }

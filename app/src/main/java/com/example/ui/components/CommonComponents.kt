@@ -16,11 +16,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,12 +40,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import com.example.data.util.ImageAndQrUtils
 import androidx.compose.foundation.text.KeyboardActions
@@ -112,6 +117,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -146,6 +153,16 @@ import com.example.ui.theme.DeepBlue
 import com.example.ui.theme.DrawerActiveBg
 import com.example.ui.theme.DrawerDarkBlue
 import com.example.ui.theme.IceBackgroundDark
+import com.example.ui.theme.IcyGlossBottom
+import com.example.ui.theme.IcyGlossMid
+import com.example.ui.theme.IcyGlossRim
+import com.example.ui.theme.IcyGlossTop
+import com.example.ui.theme.IcyGlowShadow
+import com.example.ui.theme.IcyGoldRim
+import com.example.ui.theme.IcyPillBg
+import com.example.ui.theme.IcyPillBorder
+import com.example.ui.theme.IcyWaveBright
+import com.example.ui.theme.IcyWaveLight
 import com.example.ui.theme.RoyalBlue
 import com.example.ui.theme.SoftBorderDark
 import com.example.ui.theme.SuccessGreen
@@ -153,8 +170,508 @@ import com.example.ui.theme.WarningOrange
 import com.example.ui.viewmodel.DaySalesBar
 
 val PrimaryBlueGradient = Brush.horizontalGradient(
-    colors = listOf(DeepBlue, RoyalBlue)
+    colors = listOf(Color(0xFF0A3288), Color(0xFF0E6CF5))
 )
+
+enum class IcyGlossyTone { BLUE, GREEN, RED, ORANGE }
+
+@Composable
+fun IcyGlossyButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tone: IcyGlossyTone = IcyGlossyTone.BLUE,
+    shape: Shape = CircleShape,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+    content: @Composable RowScope.() -> Unit
+) {
+    val (topCol, midCol, bottomCol, rimCol, glowCol) = when (tone) {
+        IcyGlossyTone.BLUE -> listOf(
+            IcyGlossTop,
+            IcyGlossMid,
+            IcyGlossBottom,
+            IcyGlossRim,
+            IcyGlowShadow
+        )
+        IcyGlossyTone.GREEN -> listOf(
+            Color(0xFF47E685),
+            Color(0xFF16A34A),
+            Color(0xFF0A662D),
+            Color(0xFF86EFAC),
+            Color(0xFF16A34A)
+        )
+        IcyGlossyTone.RED -> listOf(
+            Color(0xFFFF7A7A),
+            Color(0xFFDC2626),
+            Color(0xFF931414),
+            Color(0xFFFCA5A5),
+            Color(0xFFDC2626)
+        )
+        IcyGlossyTone.ORANGE -> listOf(
+            Color(0xFFFFBC5E),
+            Color(0xFFF97316),
+            Color(0xFFC2410C),
+            Color(0xFFFDBA74),
+            Color(0xFFF97316)
+        )
+    }
+
+    val fillBrush = if (enabled) {
+        Brush.verticalGradient(listOf(topCol, midCol, bottomCol))
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                Color(0xFFB5C7E3),
+                Color(0xFF8FA7CC),
+                Color(0xFF728CB6)
+            )
+        )
+    }
+    val borderBrush = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = if (enabled) 0.90f else 0.45f),
+            rimCol.copy(alpha = if (enabled) 0.85f else 0.35f)
+        )
+    )
+
+    Box(
+        modifier = modifier
+            .defaultMinSize(minHeight = 44.dp)
+            .shadow(
+                elevation = if (enabled) 8.dp else 1.dp,
+                shape = shape,
+                ambientColor = glowCol.copy(alpha = 0.55f),
+                spotColor = glowCol.copy(alpha = 0.65f)
+            )
+            .clip(shape)
+            .background(fillBrush)
+            .border(width = 1.2.dp, brush = borderBrush, shape = shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        // Upper specular gloss highlight
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to Color.White.copy(alpha = if (enabled) 0.38f else 0.14f),
+                        0.48f to Color.White.copy(alpha = if (enabled) 0.08f else 0.02f),
+                        0.52f to Color.Transparent,
+                        1.0f to Color.Transparent
+                    )
+                )
+        )
+        Row(
+            modifier = Modifier.padding(contentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            content = content
+        )
+    }
+}
+
+@Composable
+fun IcyGlossyIconTile(
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    shape: Shape = RoundedCornerShape(18.dp),
+    tone: IcyGlossyTone = IcyGlossyTone.BLUE,
+    outerRingBrush: Brush? = null,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val (topCol, midCol, bottomCol, rimCol, glowCol) = when (tone) {
+        IcyGlossyTone.BLUE -> listOf(
+            IcyGlossTop,
+            IcyGlossMid,
+            IcyGlossBottom,
+            IcyGlossRim,
+            IcyGlowShadow
+        )
+        IcyGlossyTone.GREEN -> listOf(
+            Color(0xFF47E685),
+            Color(0xFF16A34A),
+            Color(0xFF0A662D),
+            Color(0xFF86EFAC),
+            Color(0xFF16A34A)
+        )
+        IcyGlossyTone.RED -> listOf(
+            Color(0xFFFF7A7A),
+            Color(0xFFDC2626),
+            Color(0xFF931414),
+            Color(0xFFFCA5A5),
+            Color(0xFFDC2626)
+        )
+        IcyGlossyTone.ORANGE -> listOf(
+            Color(0xFFFFBC5E),
+            Color(0xFFF97316),
+            Color(0xFFC2410C),
+            Color(0xFFFDBA74),
+            Color(0xFFF97316)
+        )
+    }
+    val ring = outerRingBrush ?: Brush.verticalGradient(
+        listOf(Color.White.copy(alpha = 0.92f), rimCol)
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .shadow(
+                elevation = 10.dp,
+                shape = shape,
+                ambientColor = glowCol.copy(alpha = 0.55f),
+                spotColor = glowCol.copy(alpha = 0.65f)
+            )
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(topCol, midCol, bottomCol)))
+            .border(width = 1.6.dp, brush = ring, shape = shape),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(2.dp)
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to Color.White.copy(alpha = 0.36f),
+                        0.45f to Color.White.copy(alpha = 0.06f),
+                        0.55f to Color.Transparent
+                    )
+                )
+        )
+        content()
+    }
+}
+
+@Composable
+fun IcyPillChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
+) {
+    val darkTheme = isSystemInDarkTheme()
+    val bg = if (darkTheme) Color(0xFF19325E) else IcyPillBg
+    val border = if (darkTheme) SoftBorderDark else IcyPillBorder
+    val txtColor = if (darkTheme) Color(0xFFE8F1FF) else DeepBlue
+    Surface(
+        shape = CircleShape,
+        color = bg,
+        border = BorderStroke(1.dp, border),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (darkTheme) IcyGlossTop else RoyalBlue,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+            Text(
+                text = text,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = txtColor,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
+fun IcyCardWaveCorner(
+    modifier: Modifier = Modifier,
+    darkTheme: Boolean = isSystemInDarkTheme()
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val wave1 = Path().apply {
+            moveTo(w * 0.48f, h)
+            cubicTo(w * 0.72f, h * 0.88f, w * 0.86f, h * 0.56f, w, h * 0.28f)
+            lineTo(w, h)
+            close()
+        }
+        drawPath(
+            path = wave1,
+            brush = Brush.linearGradient(
+                colors = if (darkTheme) {
+                    listOf(Color(0x2238BDF8), Color(0x440E6CF5))
+                } else {
+                    listOf(Color(0x55B8DCFF), Color(0xAA4BB4FF))
+                },
+                start = Offset(w * 0.5f, h),
+                end = Offset(w, h * 0.25f)
+            )
+        )
+        val wave2 = Path().apply {
+            moveTo(w * 0.68f, h)
+            cubicTo(w * 0.84f, h * 0.90f, w * 0.93f, h * 0.72f, w, h * 0.54f)
+            lineTo(w, h)
+            close()
+        }
+        drawPath(
+            path = wave2,
+            brush = Brush.linearGradient(
+                colors = if (darkTheme) {
+                    listOf(Color(0x330F6DF7), Color(0x660648B8))
+                } else {
+                    listOf(Color(0x883CA7FF), Color(0xCC0D68F0))
+                },
+                start = Offset(w * 0.65f, h),
+                end = Offset(w, h * 0.52f)
+            )
+        )
+    }
+}
+
+@Composable
+fun IcySplashProgressBar(
+    progressPercent: Int,
+    modifier: Modifier = Modifier
+) {
+    val clamped = progressPercent.coerceIn(0, 100)
+    val animatedFraction by animateFloatAsState(
+        targetValue = clamped / 100f,
+        animationSpec = tween(durationMillis = 360),
+        label = "icy_progress_fraction"
+    )
+    val darkTheme = isSystemInDarkTheme()
+    val trackTop = if (darkTheme) Color(0xFF172F5B) else Color(0xFFCDE3FD)
+    val trackMid = if (darkTheme) Color(0xFF214079) else Color(0xFFF5FAFF)
+    val trackBottom = if (darkTheme) Color(0xFF102347) else Color(0xFFD5E9FF)
+    val trackBorder = if (darkTheme) Color(0xFF4772BA) else Color(0xFF8ABDF8)
+
+    Box(
+        modifier = modifier.height(42.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // Frosted Empty Capsule Track (24.dp centered vertically so water splashes & cubes can overflow above)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .shadow(
+                    elevation = 4.dp,
+                    shape = CircleShape,
+                    ambientColor = IcyGlowShadow.copy(alpha = 0.25f),
+                    spotColor = IcyGlowShadow.copy(alpha = 0.25f)
+                )
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(listOf(trackTop, trackMid, trackBottom)))
+                .border(width = 1.3.dp, color = trackBorder, shape = CircleShape)
+        ) {
+            // Subtle bottom inner rim reflection
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.White.copy(alpha = if (darkTheme) 0.14f else 0.55f))
+                        )
+                    )
+            )
+        }
+
+        // Vector Crystal Water Fill, Faceted 3D Ice Cubes & Splashing Water Droplets
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val barH = 24.dp.toPx().coerceAtMost(h * 0.72f)
+            val barTop = (h - barH) / 2f
+            val barBottom = barTop + barH
+            val radius = barH / 2f
+
+            val fillFrac = if (clamped <= 0) 0f else animatedFraction.coerceIn(0.10f, 1f)
+            val fillWidth = (w * fillFrac).coerceAtLeast(if (clamped > 0) barH else 0f)
+            val splashReachX = if (clamped <= 0) {
+                0f
+            } else {
+                (fillWidth + w * 0.42f).coerceAtMost(w * 0.96f)
+            }
+
+            if (clamped > 0) {
+                // 1. Clipped Vibrant Cyan-Blue Flowing Water Inside Capsule
+                val capsuleClip = Path().apply {
+                    addRoundRect(
+                        androidx.compose.ui.geometry.RoundRect(
+                            left = 1.dp.toPx(),
+                            top = barTop + 1.dp.toPx(),
+                            right = w - 1.dp.toPx(),
+                            bottom = barBottom - 1.dp.toPx(),
+                            cornerRadius = CornerRadius(radius, radius)
+                        )
+                    )
+                }
+                clipRect(left = 0f, top = barTop, right = fillWidth, bottom = barBottom) {
+                    drawPath(
+                        path = capsuleClip,
+                        brush = Brush.horizontalGradient(
+                            0.0f to Color(0xFF0A52CC),
+                            0.45f to Color(0xFF1497FF),
+                            0.85f to Color(0xFF42D1FF),
+                            1.0f to Color(0xFF9DF2FF),
+                            endX = fillWidth.coerceAtLeast(1f)
+                        )
+                    )
+                    // Bright horizontal water sheen inside capsule
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.65f),
+                                Color.White.copy(alpha = 0.10f),
+                                Color.Transparent
+                            ),
+                            startY = barTop,
+                            endY = barTop + barH * 0.55f
+                        ),
+                        topLeft = Offset(2.dp.toPx(), barTop + 2.dp.toPx()),
+                        size = Size((fillWidth - 4.dp.toPx()).coerceAtLeast(0f), barH * 0.48f),
+                        cornerRadius = CornerRadius(radius, radius)
+                    )
+                }
+
+                // 2. Splashing Translucent Water Trail Extending Along the Crest
+                val crestWave = Path().apply {
+                    moveTo(radius * 0.5f, barBottom - 3.dp.toPx())
+                    cubicTo(
+                        splashReachX * 0.30f, barTop + 4.dp.toPx(),
+                        splashReachX * 0.65f, barTop - 4.dp.toPx(),
+                        splashReachX, barBottom - 4.dp.toPx()
+                    )
+                    cubicTo(
+                        splashReachX * 0.70f, barBottom + 1.dp.toPx(),
+                        splashReachX * 0.32f, barBottom - 1.dp.toPx(),
+                        radius * 0.5f, barBottom - 3.dp.toPx()
+                    )
+                    close()
+                }
+                drawPath(
+                    path = crestWave,
+                    brush = Brush.horizontalGradient(
+                        0.0f to Color(0xCC2EB8FF),
+                        0.55f to Color(0x995CE1FF),
+                        1.0f to Color(0x00A6F4FF),
+                        endX = splashReachX.coerceAtLeast(1f)
+                    )
+                )
+
+                // Crisp arcing splash crown above bar edge
+                val splashArc = Path().apply {
+                    moveTo(splashReachX * 0.46f, barTop + 5.dp.toPx())
+                    cubicTo(
+                        splashReachX * 0.64f, barTop - 7.dp.toPx(),
+                        splashReachX * 0.80f, barTop - 6.dp.toPx(),
+                        splashReachX * 0.90f, barTop + 6.dp.toPx()
+                    )
+                }
+                drawPath(
+                    path = splashArc,
+                    brush = Brush.horizontalGradient(
+                        listOf(Color(0xBB38BDF8), Color(0xFFE0F7FF), Color.Transparent),
+                        startX = splashReachX * 0.44f,
+                        endX = splashReachX * 0.94f
+                    ),
+                    style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // 3. Faceted 3D Crystal Ice Cubes Riding the Water Wave
+                val cubeSpecs = listOf(
+                    Triple(0.18f, -14f, 18.dp.toPx()),
+                    Triple(0.38f, 12f, 20.dp.toPx()),
+                    Triple(0.58f, -16f, 19.dp.toPx()),
+                    Triple(0.79f, 14f, 17.dp.toPx())
+                )
+                cubeSpecs.forEach { (frac, deg, cubeSize) ->
+                    val cx = splashReachX * frac
+                    if (cx > cubeSize * 0.45f && cx < w - cubeSize * 0.35f) {
+                        val cy = h * 0.46f
+                        rotate(degrees = deg, pivot = Offset(cx, cy)) {
+                            val half = cubeSize / 2f
+                            val topLeft = Offset(cx - half, cy - half)
+                            val cr = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                            // Outer crystal cube body
+                            drawRoundRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xEEFFFFFF),
+                                        Color(0xCC9BE4FF),
+                                        Color(0xDD1C9BFF)
+                                    ),
+                                    start = Offset(cx - half, cy - half),
+                                    end = Offset(cx + half, cy + half)
+                                ),
+                                topLeft = topLeft,
+                                size = Size(cubeSize, cubeSize),
+                                cornerRadius = cr
+                            )
+                            // Inner bevel facet highlight
+                            drawRoundRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.88f),
+                                        Color(0x557CE2FF),
+                                        Color(0xAA0C6EF0)
+                                    ),
+                                    start = Offset(cx - half * 0.6f, cy - half * 0.6f),
+                                    end = Offset(cx + half * 0.6f, cy + half * 0.6f)
+                                ),
+                                topLeft = Offset(cx - half * 0.65f, cy - half * 0.65f),
+                                size = Size(cubeSize * 0.65f, cubeSize * 0.65f),
+                                cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx())
+                            )
+                            // Bright icy rim border
+                            drawRoundRect(
+                                color = Color.White.copy(alpha = 0.92f),
+                                topLeft = topLeft,
+                                size = Size(cubeSize, cubeSize),
+                                cornerRadius = cr,
+                                style = Stroke(width = 1.2.dp.toPx())
+                            )
+                        }
+                    }
+                }
+
+                // 4. Crisp Flying Water Droplets Splashing Above & Around Wave
+                val droplets = listOf(
+                    Triple(0.14f, 0.18f, 1.7.dp.toPx()),
+                    Triple(0.27f, 0.11f, 2.2.dp.toPx()),
+                    Triple(0.45f, 0.13f, 1.8.dp.toPx()),
+                    Triple(0.67f, 0.12f, 2.4.dp.toPx()),
+                    Triple(0.75f, 0.08f, 1.6.dp.toPx()),
+                    Triple(0.86f, 0.19f, 2.1.dp.toPx()),
+                    Triple(0.92f, 0.28f, 1.5.dp.toPx())
+                )
+                droplets.forEach { (dxFrac, dyFrac, r) ->
+                    val dx = splashReachX * dxFrac
+                    if (dx in 4f..(w - 4f)) {
+                        val dy = h * dyFrac
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                listOf(Color.White, Color(0xFF42C7FF)),
+                                center = Offset(dx - r * 0.25f, dy - r * 0.25f),
+                                radius = r * 1.3f
+                            ),
+                            radius = r,
+                            center = Offset(dx, dy)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 data class DrawerMenuItem(
     val route: AppRoute,
@@ -205,6 +722,44 @@ fun CrystalBackground(
             .fillMaxSize()
             .background(brush)
     ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val topRibbon = Path().apply {
+                moveTo(0f, h * 0.05f)
+                cubicTo(w * 0.28f, h * 0.16f, w * 0.65f, h * 0.08f, w, h * 0.18f)
+                lineTo(w, h * 0.24f)
+                cubicTo(w * 0.62f, h * 0.14f, w * 0.24f, h * 0.23f, 0f, h * 0.10f)
+                close()
+            }
+            drawPath(
+                path = topRibbon,
+                brush = Brush.horizontalGradient(
+                    colors = if (darkTheme) {
+                        listOf(Color(0x1438BDF8), Color(0x220F6DF7))
+                    } else {
+                        listOf(Color(0x558AC7FF), Color(0x8857B8FF))
+                    }
+                )
+            )
+            val bottomRibbon = Path().apply {
+                moveTo(0f, h * 0.83f)
+                cubicTo(w * 0.34f, h * 0.74f, w * 0.70f, h * 0.90f, w, h * 0.78f)
+                lineTo(w, h * 0.92f)
+                cubicTo(w * 0.66f, h * 0.98f, w * 0.30f, h * 0.85f, 0f, h * 0.94f)
+                close()
+            }
+            drawPath(
+                path = bottomRibbon,
+                brush = Brush.horizontalGradient(
+                    colors = if (darkTheme) {
+                        listOf(Color(0x160F6DF7), Color(0x0A38BDF8))
+                    } else {
+                        listOf(Color(0x40A7D4FF), Color(0x667CC3FF))
+                    }
+                )
+            )
+        }
         content()
     }
 }
@@ -1142,28 +1697,37 @@ fun BrohiBottomTaskbar(
     onMicClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
+    val darkTheme = isSystemInDarkTheme()
     val fourthRoute = if (activeRole == UserRole.STAFF) AppRoute.Salary else AppRoute.Sales
     val fourthLabel = if (activeRole == UserRole.STAFF) "Salary" else strings.sales
     val fourthIcon = if (activeRole == UserRole.STAFF) Icons.Outlined.Payments else Icons.Outlined.ShoppingCart
     val fourthTag = if (activeRole == UserRole.STAFF) "bottom_nav_salary" else "bottom_nav_sales"
 
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        shadowElevation = 10.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    val dockBg = if (darkTheme) Color(0xFF13264B) else Color(0xFFFDFEFF)
+    val dockBorder = if (darkTheme) SoftBorderDark else Color.White.copy(alpha = 0.95f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Transparent)
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        Box(
+        Surface(
+            color = dockBg,
+            shape = RoundedCornerShape(30.dp),
+            tonalElevation = 2.dp,
+            shadowElevation = 14.dp,
+            border = BorderStroke(1.2.dp, dockBorder),
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(66.dp),
-            contentAlignment = Alignment.Center
+                .height(64.dp)
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
@@ -1184,32 +1748,7 @@ fun BrohiBottomTaskbar(
                     modifier = Modifier.weight(1f)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .offset(y = (-6).dp)
-                            .size(54.dp)
-                            .shadow(8.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(PrimaryBlueGradient)
-                            .border(2.dp, Color.White, CircleShape)
-                            .clickable(onClick = onMicClick)
-                            .testTag("bottom_nav_mic"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = "Voice Assistant Command",
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.weight(1f))
 
                 BottomTaskItem(
                     label = fourthLabel,
@@ -1229,6 +1768,55 @@ fun BrohiBottomTaskbar(
                 )
             }
         }
+
+        // Elevated Glowing 3D Mic Orb with Gold-Ice Outer Halo Ring
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-6).dp)
+                .size(66.dp)
+                .shadow(
+                    elevation = 14.dp,
+                    shape = CircleShape,
+                    ambientColor = IcyGlowShadow.copy(alpha = 0.65f),
+                    spotColor = IcyGlowShadow.copy(alpha = 0.75f)
+                )
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.White, IcyGoldRim, IcyGlossRim)
+                    )
+                )
+                .padding(3.5.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(IcyGlossTop, IcyGlossMid, IcyGlossBottom)
+                    )
+                )
+                .border(1.2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                .clickable(onClick = onMicClick)
+                .testTag("bottom_nav_mic"),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(CircleShape)
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color.White.copy(alpha = 0.35f),
+                            0.48f to Color.Transparent
+                        )
+                    )
+            )
+            Icon(
+                imageVector = Icons.Filled.Mic,
+                contentDescription = "Voice Assistant Command",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
     }
 }
 
@@ -1241,12 +1829,17 @@ private fun BottomTaskItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val color = if (selected) RoyalBlue else MaterialTheme.colorScheme.onSurfaceVariant
+    val darkTheme = isSystemInDarkTheme()
+    val color = when {
+        selected -> if (darkTheme) IcyGlossTop else RoyalBlue
+        darkTheme -> Color(0xFFA7BBE0)
+        else -> DeepBlue
+    }
     Column(
         modifier = modifier
             .fillMaxHeight()
             .padding(vertical = 4.dp, horizontal = 2.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .testTag(testTag),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1262,7 +1855,7 @@ private fun BottomTaskItem(
             text = label,
             color = color,
             fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -1276,30 +1869,31 @@ fun BrohiCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    val surfaceColor = if (darkTheme) CrystalSurfaceDark else CrystalSurfaceLight
-    val borderColor = if (darkTheme) SoftBorderDark else CrystalBorderLight.copy(alpha = 0.85f)
-    if (onClick != null) {
-        Card(
-            onClick = onClick,
-            modifier = modifier,
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = surfaceColor),
-            border = BorderStroke(1.dp, borderColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            content()
-        }
+    val shape = RoundedCornerShape(22.dp)
+    val cardBrush = if (darkTheme) {
+        Brush.verticalGradient(listOf(Color(0xFF152B54), Color(0xFF0E2041)))
     } else {
-        Card(
-            modifier = modifier,
+        Brush.verticalGradient(listOf(Color.White, Color(0xFFF3F8FF)))
+    }
+    val borderBrush = if (darkTheme) {
+        Brush.verticalGradient(listOf(Color(0xFF2B4B85), SoftBorderDark))
+    } else {
+        Brush.verticalGradient(listOf(Color.White, CrystalBorderLight))
+    }
+    val cardModifier = modifier
+        .shadow(
+            elevation = if (darkTheme) 6.dp else 8.dp,
             shape = shape,
-            colors = CardDefaults.cardColors(containerColor = surfaceColor),
-            border = BorderStroke(1.dp, borderColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            content()
-        }
+            ambientColor = if (darkTheme) Color.Black else Color(0xFF6BA8FF).copy(alpha = 0.25f),
+            spotColor = if (darkTheme) Color.Black else Color(0xFF569BFF).copy(alpha = 0.25f)
+        )
+        .clip(shape)
+        .background(cardBrush)
+        .border(width = 1.2.dp, brush = borderBrush, shape = shape)
+        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+
+    Box(modifier = cardModifier) {
+        content()
     }
 }
 

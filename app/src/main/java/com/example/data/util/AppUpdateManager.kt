@@ -5,9 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.data.model.AppReleaseConfig
 import kotlinx.coroutines.Dispatchers
@@ -23,9 +21,14 @@ import java.net.URL
 
 sealed interface AppUpdateDownloadState {
     data object Idle : AppUpdateDownloadState
-    data class Downloading(val progressPercent: Int) : AppUpdateDownloadState
+    data class Downloading(
+        val progressPercent: Int,
+        val downloadedBytes: Long = 0L,
+        val totalBytes: Long = 0L,
+        val speedBytesPerSec: Long = 0L,
+        val estimatedRemainingSeconds: Long? = null
+    ) : AppUpdateDownloadState
     data class ReadyToInstall(val apkFile: File) : AppUpdateDownloadState
-    data object NeedsInstallPermission : AppUpdateDownloadState
     data class Failed(val message: String) : AppUpdateDownloadState
 }
 
@@ -194,24 +197,6 @@ object AppUpdateManager {
         }
     }
 
-    fun canInstallPackages(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.packageManager.canRequestPackageInstalls()
-        } else {
-            true
-        }
-    }
-
-    fun openInstallUnknownAppsSettings(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${context.packageName}")
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-        }
-    }
-
     fun downloadAndPrepareApk(
         context: Context,
         downloadUrl: String,
@@ -257,9 +242,13 @@ object AppUpdateManager {
         }
 
         val downloadId = dm.enqueue(request)
-        emit(AppUpdateDownloadState.Downloading(0))
+        emit(AppUpdateDownloadState.Downloading(progressPercent = 0))
 
         var finished = false
+        var lastSampleTimeMs = System.currentTimeMillis()
+        var lastDownloadedBytes = 0L
+        var smoothedSpeedBps = 0L
+
         while (!finished) {
             val query = DownloadManager.Query().setFilterById(downloadId)
             var cursor: Cursor? = null
@@ -272,7 +261,7 @@ object AppUpdateManager {
                     val reasonIdx = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
 
                     val status = if (statusIdx >= 0) cursor.getInt(statusIdx) else DownloadManager.STATUS_FAILED
-                    val downloaded = if (downloadedIdx >= 0) cursor.getLong(downloadedIdx) else 0L
+                    val downloaded = if (downloadedIdx >= 0) cursor.getLong(downloadedIdx).coerceAtLeast(0L) else 0L
                     val total = if (totalIdx >= 0) cursor.getLong(totalIdx) else -1L
                     val reason = if (reasonIdx >= 0) cursor.getInt(reasonIdx) else 0
 
@@ -282,8 +271,6 @@ object AppUpdateManager {
                             val file = targetFile
                             if (file == null || !file.exists()) {
                                 emit(AppUpdateDownloadState.Failed("Downloaded APK file could not be located."))
-                            } else if (!canInstallPackages(context)) {
-                                emit(AppUpdateDownloadState.NeedsInstallPermission)
                             } else {
                                 emit(AppUpdateDownloadState.ReadyToInstall(file))
                             }
@@ -293,8 +280,34 @@ object AppUpdateManager {
                             emit(AppUpdateDownloadState.Failed("APK download failed (code $reason)."))
                         }
                         else -> {
-                            val pct = if (total > 0) ((downloaded * 100L) / total).toInt().coerceIn(0, 99) else 0
-                            emit(AppUpdateDownloadState.Downloading(pct))
+                            val now = System.currentTimeMillis()
+                            val elapsedMs = (now - lastSampleTimeMs).coerceAtLeast(1L)
+                            if (elapsedMs >= 400L && downloaded >= lastDownloadedBytes) {
+                                val deltaBytes = downloaded - lastDownloadedBytes
+                                val instantSpeed = (deltaBytes * 1000L) / elapsedMs
+                                smoothedSpeedBps = if (smoothedSpeedBps <= 0L) {
+                                    instantSpeed
+                                } else {
+                                    ((smoothedSpeedBps * 6L) + (instantSpeed * 4L)) / 10L
+                                }
+                                lastSampleTimeMs = now
+                                lastDownloadedBytes = downloaded
+                            }
+                            val pct = if (total > 0L) ((downloaded * 100L) / total).toInt().coerceIn(0, 99) else 0
+                            val etaSec = if (total > downloaded && smoothedSpeedBps > 0L) {
+                                ((total - downloaded) / smoothedSpeedBps).coerceAtLeast(1L)
+                            } else {
+                                null
+                            }
+                            emit(
+                                AppUpdateDownloadState.Downloading(
+                                    progressPercent = pct,
+                                    downloadedBytes = downloaded,
+                                    totalBytes = total.coerceAtLeast(0L),
+                                    speedBytesPerSec = smoothedSpeedBps,
+                                    estimatedRemainingSeconds = etaSec
+                                )
+                            )
                         }
                     }
                 }
@@ -308,10 +321,6 @@ object AppUpdateManager {
     }.flowOn(Dispatchers.IO)
 
     fun launchApkInstaller(context: Context, apkFile: File): Result<Unit> = runCatching {
-        if (!canInstallPackages(context)) {
-            openInstallUnknownAppsSettings(context)
-            throw IllegalStateException("Please allow 'Install unknown apps' permission, then tap Install again.")
-        }
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",

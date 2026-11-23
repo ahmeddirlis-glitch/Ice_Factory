@@ -99,6 +99,9 @@ import com.example.ui.components.BrohiSubScreenTopBar
 import com.example.ui.components.Crystal3DNavigationDrawer
 import com.example.ui.components.CrystalBackground
 import com.example.ui.components.CrystalFormDialog
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyTone
+import com.example.ui.components.IcySplashProgressBar
 import com.example.ui.components.VoiceCommandBottomSheet
 import com.example.ui.navigation.AppRoute
 import com.example.ui.screens.AboutScreen
@@ -631,30 +634,35 @@ private fun AuthenticatedFactoryShell(
             )
         }
     ) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                if (currentRouteKey == AppRoute.Dashboard.key) {
-                    BrohiDashboardTopBar(
-                        photoUrl = photoUrl,
-                        notificationCount = alerts.size + (if (activeRole.canManageStaff) pendingApprovalsCount else 0),
-                        onMenuClick = { isDrawerOpen = true },
-                        onNotificationClick = { showNotificationsDialog = true },
-                        onProfileClick = { navigateToRoute(AppRoute.Profile) }
-                    )
-                } else {
-                    BrohiSubScreenTopBar(
-                        title = screenTitle,
-                        onBackClick = {
-                            if (!navController.popBackStack()) {
-                                navigateToRoute(AppRoute.Dashboard)
-                            }
+        CrystalBackground {
+            Scaffold(
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                topBar = {
+                    when (currentRouteKey) {
+                        AppRoute.Dashboard.key -> {
+                            BrohiDashboardTopBar(
+                                photoUrl = photoUrl,
+                                notificationCount = alerts.size + (if (activeRole.canManageStaff) pendingApprovalsCount else 0),
+                                onMenuClick = { isDrawerOpen = true },
+                                onNotificationClick = { showNotificationsDialog = true },
+                                onProfileClick = { navigateToRoute(AppRoute.Profile) }
+                            )
                         }
-                    )
-                }
-            },
+                        AppRoute.Updates.key -> Unit
+                        else -> {
+                            BrohiSubScreenTopBar(
+                                title = screenTitle,
+                                onBackClick = {
+                                    if (!navController.popBackStack()) {
+                                        navigateToRoute(AppRoute.Dashboard)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                },
             bottomBar = {
                 BrohiBottomTaskbar(
                     currentRouteKey = currentRouteKey,
@@ -675,7 +683,7 @@ private fun AuthenticatedFactoryShell(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                if (!faceGate.isEnrolled) {
+                if (!faceGate.isEnrolled && currentRouteKey != AppRoute.Updates.key) {
                     val remainingLabel = formatRemainingFaceDeadline(faceGate.remainingMillis)
                     Surface(
                         color = Color(0xFFFFF7ED),
@@ -711,18 +719,17 @@ private fun AuthenticatedFactoryShell(
                                     color = Color(0xFF7C2D12)
                                 )
                             }
-                            Button(
+                            IcyGlossyButton(
                                 onClick = { showMandatoryFaceEnrollDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = WarningOrange),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                tone = IcyGlossyTone.ORANGE,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                                 modifier = Modifier
                                     .heightIn(min = 42.dp)
                                     .testTag("banner_enroll_face_button")
                             ) {
-                                Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Scan", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Scan", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1024,6 +1031,13 @@ private fun AuthenticatedFactoryShell(
                             isCheckingUpdate = isCheckingUpdate,
                             lastUpdateCheckedMessage = lastUpdateCheckedMessage,
                             updateDownloadState = updateDownloadState,
+                            notificationCount = alerts.size + (if (activeRole.canManageStaff) pendingApprovalsCount else 0),
+                            onBackClick = {
+                                if (!navController.popBackStack()) {
+                                    navigateToRoute(AppRoute.Dashboard)
+                                }
+                            },
+                            onNotificationClick = { showNotificationsDialog = true },
                             onCheckForUpdates = viewModel::checkForUpdatesNow,
                             onStartUpdateDownload = { viewModel.startApkUpdateDownload(context) },
                             onInstallOrGrantPermission = { viewModel.installOrGrantPermission(context) }
@@ -1032,6 +1046,7 @@ private fun AuthenticatedFactoryShell(
                 }
                 }
             }
+        }
         }
             }
 
@@ -1243,7 +1258,6 @@ private fun AuthenticatedFactoryShell(
         val rel = appRelease!!
         val btnLabel = when (updateDownloadState) {
             is AppUpdateDownloadState.ReadyToInstall -> "Install APK"
-            is AppUpdateDownloadState.NeedsInstallPermission -> "Grant Permission"
             is AppUpdateDownloadState.Downloading -> "Downloading..."
             else -> "Update Now"
         }
@@ -1283,18 +1297,14 @@ private fun AuthenticatedFactoryShell(
             }
             when (val st = updateDownloadState) {
                 is AppUpdateDownloadState.Downloading -> {
-                    LinearProgressIndicator(
-                        progress = { (st.progressPercent / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp)),
-                        color = SuccessGreen
+                    IcySplashProgressBar(
+                        progressPercent = st.progressPercent,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Text("Downloading APK... ${st.progressPercent}%", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = DeepBlue)
                 }
                 is AppUpdateDownloadState.ReadyToInstall -> {
                     Text("APK ready! Tap Install APK below to apply update.", fontSize = 12.sp, color = SuccessGreen, fontWeight = FontWeight.Bold)
-                }
-                is AppUpdateDownloadState.NeedsInstallPermission -> {
-                    Text("Enable 'Install unknown apps' permission to apply this update.", fontSize = 12.sp, color = WarningOrange, fontWeight = FontWeight.SemiBold)
                 }
                 is AppUpdateDownloadState.Failed -> {
                     Text(st.message, fontSize = 12.sp, color = DangerRed, fontWeight = FontWeight.SemiBold)

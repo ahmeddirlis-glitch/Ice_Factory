@@ -134,6 +134,8 @@ import com.example.ui.components.BrohiCard
 import com.example.ui.components.CnicCrystalTextField
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyTone
 import com.example.ui.components.ModernRoleSelectorCardGrid
 import com.example.ui.components.ModernShiftSelector
 import com.example.ui.components.PhoneCrystalTextField
@@ -220,19 +222,17 @@ fun CameraFacePreviewBox(
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                Button(
+                IcyGlossyButton(
                     onClick = { launcher.launch(Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                    shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .testTag("enable_camera_button")
                 ) {
-                    Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Enable Camera", fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    Text("Enable Camera", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
                 }
             }
         }
@@ -464,17 +464,13 @@ fun FaceEnrollmentScreen(
                     ChecklistRow("4. Tilt head slightly up (Tilt up)", selectedHasFace)
                 }
 
-                Button(
+                IcyGlossyButton(
                     onClick = { showGuidedEnrollDialog = true },
                     enabled = selectedEmployee != null,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PrimaryBlueGradient)
                         .testTag("capture_face_angle_button")
                 ) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -867,14 +863,13 @@ fun AttendanceScreen(
                                 lineHeight = 15.sp
                             )
                             if (onSavePreEncryptedFaceTemplate != null) {
-                                Button(
+                                IcyGlossyButton(
                                     onClick = { showQuickEnrollSheet = true },
-                                    colors = ButtonDefaults.buttonColors(containerColor = WarningOrange),
-                                    shape = RoundedCornerShape(12.dp),
+                                    tone = IcyGlossyTone.ORANGE,
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp)
                                 ) {
-                                    Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = if (hasMyLegacyFace) {
@@ -882,6 +877,7 @@ fun AttendanceScreen(
                                         } else {
                                             "Register My Face Now • ابھی چہرہ اسکین کریں"
                                         },
+                                        color = Color.White,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.Center,
@@ -1091,38 +1087,32 @@ fun AttendanceScreen(
 
                 if (todayOpenRecord == null) {
                     val checkInEnabled = isStrictlyVerified && !hasMyLegacyFace
-                    Button(
+                    IcyGlossyButton(
                         onClick = {
                             onCheckIn(activeEmpId, activeEmpName, false)
                             resetVerificationSession()
                         },
                         enabled = checkInEnabled,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            disabledContainerColor = Color(0xFFDCE3EE),
-                            contentColor = Color.White,
-                            disabledContentColor = Color(0xFF64748B)
-                        ),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 54.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .let { if (checkInEnabled) it.background(PrimaryBlueGradient) else it }
                             .testTag("confirm_checkin_button")
                     ) {
-                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(19.dp))
+                        val contentTint = if (checkInEnabled) Color.White else Color.White.copy(alpha = 0.85f)
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = contentTint, modifier = Modifier.size(19.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Confirm Check-In",
+                                color = contentTint,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center
                             )
                             Text(
                                 text = if (checkInEnabled) activeEmpName else "Original Face Required • اصل چہرہ ضروری ہے",
+                                color = contentTint,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
@@ -1164,30 +1154,25 @@ fun AttendanceScreen(
                             role = activeRole
                         )
 
-                    Button(
+                    IcyGlossyButton(
                         onClick = {
                             onCheckOut(todayOpenRecord, false)
                             resetVerificationSession()
                         },
                         enabled = checkoutBiometricAllowed,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (checkoutBiometricAllowed) DeepBlue else Color(0xFFDCE3EE),
-                            disabledContainerColor = Color(0xFFDCE3EE),
-                            contentColor = Color.White,
-                            disabledContentColor = Color(0xFF64748B)
-                        ),
-                        shape = RoundedCornerShape(14.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 54.dp)
                             .testTag("confirm_checkout_button")
                     ) {
-                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(19.dp))
+                        val contentTint = if (checkoutBiometricAllowed) Color.White else Color.White.copy(alpha = 0.85f)
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = contentTint, modifier = Modifier.size(19.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = if (checkoutBiometricAllowed) "Confirm Check-Out" else "Check-Out Locked",
+                                color = contentTint,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center
@@ -1198,6 +1183,7 @@ fun AttendanceScreen(
                                 } else {
                                     "Original Face Required • اصل چہرہ ضروری ہے"
                                 },
+                                color = contentTint,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
@@ -1980,19 +1966,15 @@ fun UsersRolesScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (selectedTab == 0) {
-                Button(
+                IcyGlossyButton(
                     onClick = {
                         editingEmployee = null
                         showStaffSheet = true
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 50.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PrimaryBlueGradient)
                         .testTag("add_employee_button")
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -2258,16 +2240,15 @@ fun UsersRolesScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (statusUpper == "PENDING") {
-                                        Button(
+                                        IcyGlossyButton(
                                             onClick = { approveProfileTarget = profReq },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                            tone = IcyGlossyTone.GREEN,
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                             modifier = Modifier.weight(1.3f).heightIn(min = 42.dp)
                                         ) {
-                                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                                            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                            Text("Approve", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                         }
                                         OutlinedButton(
                                             onClick = { rejectProfileTarget = profReq },
@@ -2374,16 +2355,15 @@ fun UsersRolesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (statusUpper == "PENDING") {
-                                    Button(
+                                    IcyGlossyButton(
                                         onClick = { approveTarget = req },
-                                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                        tone = IcyGlossyTone.GREEN,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                         modifier = Modifier.weight(1.3f).heightIn(min = 42.dp)
                                     ) {
-                                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        Text("Approve", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                     }
                                     OutlinedButton(
                                         onClick = { rejectTarget = req },
@@ -2659,44 +2639,44 @@ fun UsersRolesScreen(
                         ) {
                             Text("Cancel", maxLines = 1)
                         }
-                        Button(
+                        IcyGlossyButton(
                             onClick = {
                                 triedSubmit = true
                                 if (name.isBlank()) {
                                     formError = "Please enter staff member's full name"
                                     popupTitle = "Full Name Required (نام ضروری ہے)"
                                     popupMessage = formError
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (cnicDigits.isNotEmpty() && !PakistaniFormatters.isValidCnic(cnicDigits)) {
                                     formError = "CNIC is not complete. Please enter 13 digits (e.g. 44204-1253835-5)."
                                     popupTitle = "CNIC Number Not Complete"
                                     popupMessage = "CNIC number is not complete. Please enter all 13 digits (e.g. 44204-1253835-5).\n\nشناختی کارڈ نمبر مکمل نہیں ہے، براہ کرم 13 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (!PakistaniFormatters.isValidPhone(phoneDigits)) {
                                     formError = "Mobile Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "Mobile number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nموبائل نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں (مثلاً 0333-2828285)۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (whatsappDigits.isNotEmpty() && !PakistaniFormatters.isValidPhone(whatsappDigits)) {
                                     formError = "WhatsApp Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "WhatsApp number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nواٹس ایپ نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (emergencyDigits.isNotEmpty() && !PakistaniFormatters.isValidPhone(emergencyDigits)) {
                                     formError = "Emergency Contact Number is not complete (11 digits required)."
                                     popupTitle = "Number Is Not Complete (نمبر مکمل نہیں ہے)"
                                     popupMessage = "Emergency contact number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nہنگامی نمبر مکمل نہیں ہے، براہ کرم پورے 11 ہندسے درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 if (emergencyMatchesPrimary) {
                                     formError = "Emergency contact cannot be same as Mobile or WhatsApp number."
                                     popupTitle = "Different Emergency Number Required"
                                     popupMessage = "Emergency contact number cannot be the same as Mobile or WhatsApp number. Please enter a different family or alternate number.\n\nہنگامی رابطہ نمبر موبائل یا واٹس ایپ جیسا نہیں ہو سکتا، براہ کرم کوئی دوسرا نمبر درج کریں۔"
-                                    return@Button
+                                    return@IcyGlossyButton
                                 }
                                 val currentSal = salary.toDoubleOrNull() ?: 35000.0
                                 val startSal = initialSalary.toDoubleOrNull() ?: currentSal
@@ -2719,14 +2699,10 @@ fun UsersRolesScreen(
                                 )
                                 showStaffSheet = false
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                             modifier = Modifier
                                 .weight(0.62f)
                                 .heightIn(min = 48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PrimaryBlueGradient)
                         ) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))

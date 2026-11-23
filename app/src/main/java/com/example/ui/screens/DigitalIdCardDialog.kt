@@ -93,6 +93,7 @@ import com.example.data.model.resolveIdCardPhoto
 import com.example.data.util.ImageAndQrUtils
 import com.example.data.util.PakistaniFormatters
 import com.example.ui.components.CrystalFullPhotoViewerDialog
+import com.example.ui.components.IcyGlossyButton
 import com.example.ui.components.UserAvatarImage
 import com.example.ui.components.rememberCameraPhotoLauncher
 import com.example.ui.theme.CrystalBorderLight
@@ -372,35 +373,32 @@ fun DigitalEmployeeIdDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Button(
+                                IcyGlossyButton(
                                     onClick = { launchIdCamera() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                     modifier = Modifier.testTag("camera_manual_id_photo_button")
                                 ) {
-                                    Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Camera", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    Text("Camera", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                 }
 
-                                Button(
+                                IcyGlossyButton(
                                     onClick = {
                                         idPhotoPicker.launch(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                         )
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                     modifier = Modifier
                                         .weight(1f)
                                         .testTag("upload_manual_id_photo_button")
                                 ) {
-                                    Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Icon(Icons.Filled.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = if (!manualIdPhoto.isNullOrBlank()) "Change Manual" else "Upload Manual",
+                                        color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1
@@ -451,10 +449,8 @@ fun DigitalEmployeeIdDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Button(
+                IcyGlossyButton(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                    shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .fillMaxWidth()

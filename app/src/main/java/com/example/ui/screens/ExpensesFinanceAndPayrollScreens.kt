@@ -92,6 +92,8 @@ import com.example.data.util.StatementFilterGroup
 import com.example.ui.components.BrohiCard
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyTone
 import com.example.ui.components.PrimaryBlueGradient
 import com.example.ui.theme.DangerRed
 import com.example.ui.theme.DangerRedSoft
@@ -227,19 +229,14 @@ fun ExpensesFinanceScreen(
                 }
 
                 // Financial & Transaction Statement CTA (Right-Side Blue Wave Design)
-                Button(
+                IcyGlossyButton(
                     onClick = {
                         statementFilter = StatementFilterGroup.ALL
                         showFinancialStatement = true
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = PaddingValues(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PrimaryBlueGradient)
                         .testTag("open_financial_statement_button")
                 ) {
                     Icon(Icons.Filled.PictureAsPdf, contentDescription = null, tint = Color.White)
@@ -254,16 +251,11 @@ fun ExpensesFinanceScreen(
             }
 
             if (!activeRole.isOwner || selectedTab == 1) {
-                Button(
+                IcyGlossyButton(
                     onClick = { showAddExpense = true },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PrimaryBlueGradient)
+                        .height(50.dp)
                         .testTag("add_expense_button")
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
@@ -346,15 +338,13 @@ fun ExpensesFinanceScreen(
             }
 
             if (activeRole.isOwner && selectedTab == 2) {
-                Button(
+                IcyGlossyButton(
                     onClick = { showAddFunding = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("add_funding_button")
+                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("add_funding_button")
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Record Funding / Loan", fontWeight = FontWeight.Bold)
+                    Text("Record Funding / Loan", color = Color.White, fontWeight = FontWeight.Bold)
                 }
 
                 fundingList.forEach { entry ->
@@ -846,18 +836,16 @@ fun SalaryPayrollScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (activeRole.isOwner) {
-            Button(
+            IcyGlossyButton(
                 onClick = {
                     createPreselectedEmp = employees.firstOrNull()
                     showCreate = true
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
-                Icon(Icons.Filled.Payments, contentDescription = null)
+                Icon(Icons.Filled.Payments, contentDescription = null, tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Generate Salary Slip", fontWeight = FontWeight.Bold)
+                Text("Generate Salary Slip", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -1023,14 +1011,14 @@ fun SalaryPayrollScreen(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (!rec.paid && activeRole.isOwner) {
-                                Button(
+                                IcyGlossyButton(
                                     onClick = { onMarkPaid(rec) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                    tone = IcyGlossyTone.GREEN,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
-                                    Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Pay", fontSize = 12.sp)
+                                    Text("Pay", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             if (activeRole.isOwner) {
@@ -1438,26 +1426,25 @@ private fun EmployeeSalaryProfileSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
+                        IcyGlossyButton(
                             onClick = onGenerateSlip,
-                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("New Slip", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                            Text("New Slip", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
                         }
                         if (pendingDue > 0) {
-                            Button(
+                            IcyGlossyButton(
                                 onClick = {
                                     slips.filter { !it.paid }.forEach { onMarkPaid(it) }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                tone = IcyGlossyTone.GREEN,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Pay Due", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                                Text("Pay Due", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
                             }
                         }
                     }

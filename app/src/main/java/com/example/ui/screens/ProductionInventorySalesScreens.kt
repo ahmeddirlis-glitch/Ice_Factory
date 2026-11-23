@@ -101,6 +101,7 @@ import com.example.data.util.StatementDocumentModel
 import com.example.ui.components.BrohiCard
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyGlossyButton
 import com.example.ui.components.PhoneCrystalTextField
 import com.example.ui.components.PrimaryBlueGradient
 import com.example.ui.components.StockDonutChart
@@ -204,16 +205,11 @@ fun ProductionScreen(
                 }
             }
 
-            Button(
+            IcyGlossyButton(
                 onClick = { showAddDialog = true },
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(PrimaryBlueGradient)
+                    .height(50.dp)
                     .testTag("add_production_button")
             ) {
                 Icon(Icons.Filled.AddBox, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -495,16 +491,11 @@ fun InventoryColdStorageScreen(
             }
         }
 
-        Button(
+        IcyGlossyButton(
             onClick = { showMoveDialog = true },
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(PrimaryBlueGradient)
+                .height(50.dp)
                 .testTag("stock_movement_button")
         ) {
             Text("Record Stock In / Out", color = Color.White, fontWeight = FontWeight.Bold)
@@ -851,7 +842,7 @@ fun SalesInvoicingScreen(
                             )
                         }
 
-                        Button(
+                        IcyGlossyButton(
                             onClick = {
                                 onCreateSale(
                                     selectedCustomer?.id ?: "",
@@ -864,14 +855,9 @@ fun SalesInvoicingScreen(
                                 )
                                 quantity = 1L
                             },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(PrimaryBlueGradient)
+                                .height(50.dp)
                                 .testTag("create_invoice_button")
                         ) {
                             Icon(Icons.Filled.ReceiptLong, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -1121,13 +1107,12 @@ fun CustomersCreditScreen(
                         Text("Total Credit Pending (Udhar)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(PakistaniFormatters.formatPkr(totalPending), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = DangerRed)
                     }
-                    Button(
-                        onClick = { showAddDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue)
+                    IcyGlossyButton(
+                        onClick = { showAddDialog = true }
                     ) {
-                        Icon(Icons.Filled.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add")
+                        Text("Add", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
                 OutlinedButton(
@@ -1433,15 +1418,13 @@ fun DeliveriesVehiclesScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
+        IcyGlossyButton(
             onClick = { editingDelivery = null; showAddOrEdit = true },
-            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Icon(Icons.Filled.LocalShipping, contentDescription = null)
+            Icon(Icons.Filled.LocalShipping, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Dispatch Ice Delivery", fontWeight = FontWeight.Bold)
+            Text("Dispatch Ice Delivery", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         deliveries.forEach { d ->

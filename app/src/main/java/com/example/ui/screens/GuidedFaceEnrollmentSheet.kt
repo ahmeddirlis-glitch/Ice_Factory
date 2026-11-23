@@ -100,6 +100,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.face.FaceDetectionAnalyzer
 import com.example.data.face.LiveFaceAnalysis
 import com.example.data.util.FaceCryptoHelper
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyTone
 import com.example.ui.theme.RoyalBlue
 import java.util.concurrent.Executors
 
@@ -268,18 +270,17 @@ fun GuidedFaceEnrollmentFlow(
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
+                IcyGlossyButton(
                     onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    shape = RoundedCornerShape(14.dp),
+                    tone = IcyGlossyTone.GREEN,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
                         .testTag("guided_enroll_enable_camera")
                 ) {
-                    Icon(Icons.Filled.CameraAlt, contentDescription = null)
+                    Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Enable Camera (کیمرہ آن کریں)", fontWeight = FontWeight.Bold)
+                    Text("Enable Camera (کیمرہ آن کریں)", color = Color.White, fontWeight = FontWeight.Bold)
                 }
                 if (onCancel != null) {
                     Spacer(modifier = Modifier.height(12.dp))
@@ -411,7 +412,7 @@ fun GuidedFaceEnrollmentFlow(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Button(
+                IcyGlossyButton(
                     onClick = {
                         // Pose 0 (Front) is index 0; encode all 4 poses securely
                         val orderedDescriptors = allPoses.mapNotNull { pose ->
@@ -431,8 +432,6 @@ fun GuidedFaceEnrollmentFlow(
                         onPortraitCaptured?.invoke(portraitUri)
                         onCompleted(encrypted)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF111827)),
-                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)

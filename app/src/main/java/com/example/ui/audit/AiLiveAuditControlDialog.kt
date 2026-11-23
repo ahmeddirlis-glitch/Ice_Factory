@@ -78,6 +78,7 @@ import com.example.data.model.AiAuditFinding
 import com.example.data.model.AuditIssueStatus
 import com.example.data.model.AuditSeverity
 import com.example.data.util.RuntimeDiagnosticLogger
+import com.example.ui.components.IcyGlossyButton
 import com.example.ui.components.PrimaryBlueGradient
 import com.example.ui.theme.CrystalBorderLight
 import com.example.ui.theme.CrystalIceBgMid
@@ -265,12 +266,10 @@ fun AiLiveAuditControlDialog(
                             )
                         }
 
-                        Button(
+                        IcyGlossyButton(
                             onClick = onScanCurrentScreen,
                             enabled = !uiState.isAuditing,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             modifier = Modifier
                                 .heightIn(min = 42.dp)
                                 .testTag("instant_screen_check_button")
@@ -278,11 +277,11 @@ fun AiLiveAuditControlDialog(
                             if (uiState.isAuditing) {
                                 CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Scanning...", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                Text("Scanning...", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                             } else {
-                                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(5.dp))
-                                Text("Scan Now", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                Text("Scan Now", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

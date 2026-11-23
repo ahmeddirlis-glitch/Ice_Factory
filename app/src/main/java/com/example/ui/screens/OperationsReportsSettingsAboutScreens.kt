@@ -1,19 +1,27 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -31,17 +40,21 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
@@ -57,6 +70,7 @@ import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,7 +79,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -80,15 +93,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
+import com.example.R
 import com.example.data.model.AppReleaseConfig
 import com.example.data.model.Expense
 import com.example.data.model.FactoryNotice
@@ -112,6 +139,12 @@ import com.example.ui.components.BilingualPillLabel
 import com.example.ui.components.BrohiCard
 import com.example.ui.components.CrystalFormDialog
 import com.example.ui.components.CrystalTextField
+import com.example.ui.components.IcyCardWaveCorner
+import com.example.ui.components.IcyGlossyButton
+import com.example.ui.components.IcyGlossyIconTile
+import com.example.ui.components.IcyGlossyTone
+import com.example.ui.components.IcyPillChip
+import com.example.ui.components.IcySplashProgressBar
 import com.example.ui.components.PhoneCrystalTextField
 import com.example.ui.components.PrimaryBlueGradient
 import com.example.ui.components.ValidationPopupDialog
@@ -120,6 +153,7 @@ import com.example.ui.theme.AccentPurpleSoft
 import com.example.ui.theme.DangerRed
 import com.example.ui.theme.DangerRedSoft
 import com.example.ui.theme.DeepBlue
+import com.example.ui.theme.IcyGlowShadow
 import com.example.ui.theme.RoyalBlue
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.SuccessGreenSoft
@@ -157,15 +191,13 @@ fun UtilitiesScreen(
             }
         }
 
-        Button(
+        IcyGlossyButton(
             onClick = { showAdd = true },
-            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
+            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Log $selectedType Reading / Cost", fontWeight = FontWeight.Bold)
+            Text("Log $selectedType Reading / Cost", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         readings.filter { it.type == selectedType }.forEach { r ->
@@ -432,15 +464,13 @@ fun MaintenanceScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
+        IcyGlossyButton(
             onClick = { showAdd = true },
-            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Icon(Icons.Filled.Build, contentDescription = null)
+            Icon(Icons.Filled.Build, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Add Ice Machine / Compressor", fontWeight = FontWeight.Bold)
+            Text("Add Ice Machine / Compressor", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         machines.forEach { m ->
@@ -729,15 +759,13 @@ fun SuppliersScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
+        IcyGlossyButton(
             onClick = { showAdd = true },
-            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
+            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Add Supplier (Salt / Ammonia / Bags)", fontWeight = FontWeight.Bold)
+            Text("Add Supplier (Salt / Ammonia / Bags)", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         suppliers.forEach { sup ->
@@ -1023,15 +1051,14 @@ fun SafetyIncidentsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
+        IcyGlossyButton(
             onClick = { showAdd = true },
-            colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp)
+            tone = IcyGlossyTone.RED,
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Icon(Icons.Filled.WarningAmber, contentDescription = null)
+            Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Log Safety Incident", fontWeight = FontWeight.Bold)
+            Text("Log Safety Incident", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         incidents.forEach { inc ->
@@ -1305,19 +1332,14 @@ fun ReportsAnalyticsScreen(
             }
         }
 
-        Button(
+        IcyGlossyButton(
             onClick = {
                 statementFilter = StatementFilterGroup.ALL
                 showStatementPreview = true
             },
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(PrimaryBlueGradient)
+                .height(50.dp)
                 .testTag("view_reports_financial_statement")
         ) {
             Icon(Icons.Filled.PictureAsPdf, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -1579,10 +1601,8 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        IcyGlossyButton(
                             onClick = onOpenAiAuditInbox,
-                            colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).testTag("settings_open_audit_inbox_button")
                         ) {
                             Icon(Icons.Filled.AutoFixHigh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
@@ -1665,16 +1685,18 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Button(
+                    IcyGlossyButton(
                         onClick = onCheckForUpdates,
                         enabled = !isCheckingUpdate,
-                        colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
                         modifier = Modifier.testTag("check_for_updates_button")
                     ) {
                         if (isCheckingUpdate) {
                             CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         } else {
-                            Text("Check Updates", fontSize = 12.sp)
+                            Icon(Icons.Filled.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Check Updates", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
@@ -1714,45 +1736,35 @@ fun SettingsScreen(
 
                             when (val st = updateDownloadState) {
                                 is AppUpdateDownloadState.Downloading -> {
-                                    LinearProgressIndicator(
-                                        progress = { (st.progressPercent / 100f).coerceIn(0f, 1f) },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                        color = SuccessGreen
+                                    IcySplashProgressBar(
+                                        progressPercent = st.progressPercent,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
-                                    Text("Downloading APK... ${st.progressPercent}%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Downloading APK... ${st.progressPercent}%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = DeepBlue)
                                 }
                                 is AppUpdateDownloadState.ReadyToInstall -> {
-                                    Button(
+                                    IcyGlossyButton(
                                         onClick = onInstallOrGrantPermission,
-                                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                        tone = IcyGlossyTone.GREEN,
                                         modifier = Modifier.fillMaxWidth().testTag("install_downloaded_apk_button")
                                     ) {
                                         Text("Install Downloaded Update (اپڈیٹ انسٹال کریں)", color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
-                                is AppUpdateDownloadState.NeedsInstallPermission -> {
-                                    Button(
-                                        onClick = onInstallOrGrantPermission,
-                                        colors = ButtonDefaults.buttonColors(containerColor = WarningOrange),
-                                        modifier = Modifier.fillMaxWidth().testTag("grant_install_permission_button")
-                                    ) {
-                                        Text("Allow Unknown Apps & Install (اجازت دیں)", color = Color.White, fontWeight = FontWeight.Bold)
-                                    }
-                                }
                                 is AppUpdateDownloadState.Failed -> {
                                     Text(st.message, fontSize = 11.sp, color = DangerRed, fontWeight = FontWeight.SemiBold)
-                                    Button(
+                                    IcyGlossyButton(
                                         onClick = onStartUpdateDownload,
-                                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                        tone = IcyGlossyTone.GREEN,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text("Retry Update Download", color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 AppUpdateDownloadState.Idle -> {
-                                    Button(
+                                    IcyGlossyButton(
                                         onClick = onStartUpdateDownload,
-                                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                        tone = IcyGlossyTone.GREEN,
                                         modifier = Modifier.fillMaxWidth().testTag("settings_update_now_button")
                                     ) {
                                         Text("Update Now (ابھی اپڈیٹ کریں)", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1862,14 +1874,12 @@ fun SettingsScreen(
                             Text("Mandatory Update (لازمی اپڈیٹ)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Switch(checked = pubMandatory, onCheckedChange = { pubMandatory = it })
                         }
-                        Button(
+                        IcyGlossyButton(
                             onClick = {
                                 val vc = pubVersionCode.toIntOrNull() ?: 0
                                 onPublishAppUpdate(vc, pubVersionName, pubApkUrl, pubNotesEn, pubNotesUr, pubMandatory)
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth().height(48.dp).testTag("publish_update_button")
+                            modifier = Modifier.fillMaxWidth().height(50.dp).testTag("publish_update_button")
                         ) {
                             Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1933,12 +1943,12 @@ fun SettingsScreen(
                         urduLabel = "آغاز کی تاریخ",
                         leadingIcon = Icons.Filled.CalendarMonth
                     )
-                    Button(
+                    IcyGlossyButton(
                         onClick = {
                             triedSettingsSave = true
                             if (phoneDigits.isNotEmpty() && !PakistaniFormatters.isValidPhone(phoneDigits)) {
                                 settingsPopupMessage = "Factory phone number is not complete. Please enter all 11 digits (e.g. 0333-2828285).\n\nفون نمبر مکمل نہیں ہے، براہ کرم 11 ہندسے درج کریں۔"
-                                return@Button
+                                return@IcyGlossyButton
                             }
                             onSaveSettings(
                                 settings.copy(
@@ -1951,14 +1961,9 @@ fun SettingsScreen(
                                 )
                             )
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(PrimaryBlueGradient)
+                            .height(50.dp)
                     ) {
                         Text("Save Factory Settings", color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -2109,93 +2114,742 @@ fun AppUpdatesScreen(
     isCheckingUpdate: Boolean,
     lastUpdateCheckedMessage: String?,
     updateDownloadState: AppUpdateDownloadState,
+    notificationCount: Int = 0,
+    onBackClick: () -> Unit = {},
+    onNotificationClick: () -> Unit = {},
     onCheckForUpdates: () -> Unit,
     onStartUpdateDownload: () -> Unit,
     onInstallOrGrantPermission: () -> Unit
 ) {
+    val darkTheme = isSystemInDarkTheme()
+    val headingColor = if (darkTheme) Color.White else DeepBlue
+    val subtitleColor = if (darkTheme) Color(0xFFBBD3FF) else Color(0xFF3E5682)
+    val dividerColor = if (darkTheme) Color(0xFF2B4B85) else Color(0xFFBFD7FA)
+
+    val bulletLines = remember(appRelease, isUpdateAvailable) {
+        val raw = appRelease?.releaseNotes.orEmpty()
+            .lines()
+            .map { it.trim().removePrefix("•").removePrefix("-").removePrefix("*").trim() }
+            .filter { it.isNotBlank() }
+        val defaults = listOf(
+            "New features and improvements.",
+            "Enhanced performance and stability.",
+            "Bug fixes and better user experience."
+        )
+        val combined = if (raw.isNotEmpty()) raw.take(3) else defaults
+        val urNote = appRelease?.releaseNotesUrdu?.trim().orEmpty()
+        if (isUpdateAvailable && urNote.isNotBlank()) combined + urNote else combined
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        BrohiCard(modifier = Modifier.fillMaxWidth()) {
+        // Custom Frosted Icy Header matching the reference 100%
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(top = 6.dp, bottom = 20.dp)
+        ) {
+            // Sweeping blue curved wave at base of header + crystal ice splash on right
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(104.dp)
+                    .align(Alignment.BottomCenter)
+            ) {
+                val w = size.width
+                val h = size.height
+                val sweep = Path().apply {
+                    moveTo(0f, h * 0.30f)
+                    cubicTo(w * 0.25f, h * 0.88f, w * 0.72f, h * 0.94f, w, h * 0.68f)
+                    lineTo(w, h * 0.92f)
+                    cubicTo(w * 0.68f, h * 1.04f, w * 0.22f, h * 0.96f, 0f, h * 0.46f)
+                    close()
+                }
+                drawPath(
+                    path = sweep,
+                    brush = Brush.horizontalGradient(
+                        colors = if (darkTheme) {
+                            listOf(Color(0x5538BDF8), Color(0x880E6CF5))
+                        } else {
+                            listOf(Color(0x993EB6FF), Color(0xCC58BFFF), Color(0x9995D5FF))
+                        }
+                    )
+                )
+            }
+
+            // Blended top-right ice cube splash graphic with feathered radial mask (no rectangular border)
+            Image(
+                painter = painterResource(R.drawable.img_icy_header_cubes),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 8.dp, y = 14.dp)
+                    .size(width = 172.dp, height = 86.dp)
+                    .graphicsLayer {
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                0.0f to Color.White,
+                                0.62f to Color.White,
+                                1.0f to Color.Transparent,
+                                center = Offset(size.width * 0.56f, size.height * 0.58f),
+                                radius = size.width * 0.60f
+                            ),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PrimaryBlueGradient),
-                    contentAlignment = Alignment.Center
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.testTag("subscreen_back_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.SystemUpdate,
-                        contentDescription = "App Updates",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Navigate back",
+                        tint = headingColor,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 4.dp, end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     Text(
-                        text = "GitHub Direct Auto-Updates",
-                        fontSize = 16.sp,
+                        text = "App Updates",
+                        fontSize = 23.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = DeepBlue
+                        color = headingColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Installed: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                        text = "Stay Updated, Get the Latest Features",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = RoyalBlue
+                        color = subtitleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = "براہِ راست گِٹ ہب آٹو اپڈیٹ • ${com.example.data.util.AppUpdateManager.GITHUB_OWNER}/${com.example.data.util.AppUpdateManager.GITHUB_REPO}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                }
+
+                // Frosted circular Notification Bell with red count badge
+                Box(modifier = Modifier.padding(end = 4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = CircleShape,
+                                ambientColor = IcyGlowShadow.copy(alpha = 0.25f),
+                                spotColor = IcyGlowShadow.copy(alpha = 0.25f)
+                            )
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    if (darkTheme) listOf(Color(0xFF1A3568), Color(0xFF11244A))
+                                    else listOf(Color.White, Color(0xFFEAF3FF))
+                                )
+                            )
+                            .border(
+                                width = 1.4.dp,
+                                color = if (darkTheme) Color(0xFF3A5F9E) else Color.White,
+                                shape = CircleShape
+                            )
+                            .clickable(onClick = onNotificationClick)
+                            .testTag("updates_notification_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Notifications",
+                            tint = headingColor,
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
+                    if (notificationCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = DangerRed,
+                            border = BorderStroke(1.2.dp, Color.White),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 2.dp, y = (-2).dp)
+                        ) {
+                            Text(
+                                text = if (notificationCount > 99) "99+" else notificationCount.toString(),
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        AppUpdateChannelCard(
-            appRelease = appRelease,
-            isUpdateAvailable = isUpdateAvailable,
-            isCheckingUpdate = isCheckingUpdate,
-            lastUpdateCheckedMessage = lastUpdateCheckedMessage,
-            updateDownloadState = updateDownloadState,
-            onCheckForUpdates = onCheckForUpdates,
-            onStartUpdateDownload = onStartUpdateDownload,
-            onInstallOrGrantPermission = onInstallOrGrantPermission
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Card 1: Glossy Factory Tile + Version/Build Pills + Title
+            BrohiCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    IcyGlossyIconTile(
+                        size = 66.dp,
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        FactoryIconSilhouette(
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .width(1.2.dp)
+                            .height(60.dp)
+                            .background(dividerColor)
+                    )
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IcyPillChip(text = "Version : v${BuildConfig.VERSION_NAME}")
+                            IcyPillChip(text = "Build : ${BuildConfig.VERSION_CODE}")
+                        }
+                        Text(
+                            text = "Brohi Ice Factory",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = headingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Smart Management for Ice Factory",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = subtitleColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Card 2: Check for Updates + Glossy Check Now Button
+            BrohiCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Sync,
+                        contentDescription = null,
+                        tint = RoyalBlue,
+                        modifier = Modifier.size(40.dp)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .width(1.2.dp)
+                            .height(48.dp)
+                            .background(dividerColor)
+                    )
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "Check for Updates",
+                            fontSize = 15.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = headingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = lastUpdateCheckedMessage?.takeIf { it.isNotBlank() }
+                                ?: "Check for latest version",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isUpdateAvailable) SuccessGreen else subtitleColor,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    IcyGlossyButton(
+                        onClick = onCheckForUpdates,
+                        enabled = !isCheckingUpdate,
+                        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp),
+                        modifier = Modifier.testTag("about_check_updates_button")
+                    ) {
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Checking",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Sync,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Check Now",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Card 3: Update Details with glossy (i) orb, glowing bullets & bottom-right icy wave
+            BrohiCard(modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IcyCardWaveCorner(
+                        darkTheme = darkTheme,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(width = 185.dp, height = 105.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            IcyGlossyIconTile(
+                                size = 34.dp,
+                                shape = CircleShape
+                            ) {
+                                Canvas(modifier = Modifier.size(18.dp)) {
+                                    val cx = size.width / 2f
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = size.width * 0.12f,
+                                        center = Offset(cx, size.height * 0.24f)
+                                    )
+                                    drawRoundRect(
+                                        color = Color.White,
+                                        topLeft = Offset(cx - size.width * 0.11f, size.height * 0.43f),
+                                        size = Size(size.width * 0.22f, size.height * 0.44f),
+                                        cornerRadius = CornerRadius(4f, 4f)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Update Details",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = headingColor,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isUpdateAvailable && appRelease != null) {
+                                IcyPillChip(text = "v${appRelease.latestVersionName}")
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.padding(start = 6.dp, end = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            bulletLines.forEach { line ->
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(top = 5.dp)
+                                            .size(8.dp)
+                                            .shadow(3.dp, CircleShape, ambientColor = IcyGlowShadow, spotColor = IcyGlowShadow)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    listOf(Color(0xFF56C3FF), RoyalBlue)
+                                                )
+                                            )
+                                    )
+                                    Text(
+                                        text = line,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = headingColor.copy(alpha = 0.90f),
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card 4: Live Download & Install Card matching reference 100% (Download Orb, Speed Pill, Ice Splash Progress Bar, % & ETA)
+            BrohiCard(modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IcyCardWaveCorner(
+                        darkTheme = darkTheme,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(width = 195.dp, height = 115.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val st = updateDownloadState
+                        val targetVersionLabel = appRelease?.latestVersionName?.ifBlank { null } ?: BuildConfig.VERSION_NAME
+
+                        val statusTitle = when (st) {
+                            is AppUpdateDownloadState.Downloading -> "Downloading v$targetVersionLabel..."
+                            is AppUpdateDownloadState.ReadyToInstall -> "Ready to Install v$targetVersionLabel"
+                            is AppUpdateDownloadState.Failed -> "Update Download Failed"
+                            AppUpdateDownloadState.Idle -> if (isUpdateAvailable && appRelease != null) {
+                                "Update v$targetVersionLabel Available"
+                            } else {
+                                "Latest Version v${BuildConfig.VERSION_NAME}"
+                            }
+                        }
+
+                        val statusSubtitle = when (st) {
+                            is AppUpdateDownloadState.Downloading -> {
+                                val downStr = formatBytesMb(st.downloadedBytes)
+                                val totalStr = if (st.totalBytes > 0L) formatBytesMb(st.totalBytes) else "Calculating..."
+                                "$downStr / $totalStr"
+                            }
+                            is AppUpdateDownloadState.ReadyToInstall -> "Download complete • Ready to install"
+                            is AppUpdateDownloadState.Failed -> st.message
+                            AppUpdateDownloadState.Idle -> if (isUpdateAvailable && appRelease != null) {
+                                "Build ${BuildConfig.VERSION_CODE}  →  Build ${appRelease.latestVersionCode}"
+                            } else {
+                                "Build ${BuildConfig.VERSION_CODE} • Up to Date"
+                            }
+                        }
+
+                        val badgeChipText = when (st) {
+                            is AppUpdateDownloadState.Downloading -> formatSpeedLabel(st.speedBytesPerSec)
+                            is AppUpdateDownloadState.ReadyToInstall -> "100% Ready"
+                            is AppUpdateDownloadState.Failed -> "Retry"
+                            AppUpdateDownloadState.Idle -> if (isUpdateAvailable && appRelease != null) {
+                                "Build ${appRelease.latestVersionCode}"
+                            } else {
+                                "Up to Date"
+                            }
+                        }
+
+                        val displayPercent = when (st) {
+                            is AppUpdateDownloadState.Downloading -> st.progressPercent
+                            is AppUpdateDownloadState.ReadyToInstall -> 100
+                            is AppUpdateDownloadState.Failed -> 0
+                            AppUpdateDownloadState.Idle -> if (isUpdateAvailable) 0 else 100
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(58.dp)
+                                    .shadow(8.dp, CircleShape, ambientColor = IcyGlowShadow, spotColor = IcyGlowShadow)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .border(1.5.dp, Color(0xFFB5DAFF), CircleShape)
+                                    .padding(3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IcyGlossyIconTile(
+                                    size = 52.dp,
+                                    shape = CircleShape,
+                                    tone = when (st) {
+                                        is AppUpdateDownloadState.Failed -> IcyGlossyTone.RED
+                                        else -> IcyGlossyTone.BLUE
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = when (st) {
+                                            is AppUpdateDownloadState.ReadyToInstall -> Icons.Filled.CheckCircle
+                                            else -> Icons.Filled.Download
+                                        },
+                                        contentDescription = "Update status",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = statusTitle,
+                                    fontSize = 15.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = headingColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = statusSubtitle,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (st is AppUpdateDownloadState.Failed) DangerRed else headingColor.copy(alpha = 0.85f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            IcyPillChip(
+                                text = badgeChipText,
+                                icon = if (st is AppUpdateDownloadState.Downloading || isUpdateAvailable) Icons.Filled.Bolt else Icons.Filled.CheckCircle
+                            )
+                        }
+
+                        // Crystal Ice Splash Capsule Progress Bar + Percentage
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            IcySplashProgressBar(
+                                progressPercent = displayPercent,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "$displayPercent%",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = headingColor
+                            )
+                        }
+
+                        // Clock & Estimated Time Row
+                        val etaRowText = when (st) {
+                            is AppUpdateDownloadState.Downloading ->
+                                "Estimated Time: ${formatEtaLabel(st.estimatedRemainingSeconds)}"
+                            is AppUpdateDownloadState.ReadyToInstall ->
+                                "Estimated Time: Completed • Tap Install below"
+                            is AppUpdateDownloadState.Failed ->
+                                "Download interrupted • Tap Retry below"
+                            AppUpdateDownloadState.Idle -> if (isUpdateAvailable && appRelease != null) {
+                                "Ready to download v$targetVersionLabel"
+                            } else {
+                                "Estimated Time: Complete • All features up to date"
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = headingColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = etaRowText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = headingColor
+                            )
+                        }
+
+                        when (st) {
+                            is AppUpdateDownloadState.ReadyToInstall -> {
+                                IcyGlossyButton(
+                                    onClick = onInstallOrGrantPermission,
+                                    tone = IcyGlossyTone.GREEN,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("about_install_apk_button")
+                                ) {
+                                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Install Downloaded Update (اپڈیٹ انسٹال کریں)", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            is AppUpdateDownloadState.Failed -> {
+                                IcyGlossyButton(
+                                    onClick = onStartUpdateDownload,
+                                    tone = IcyGlossyTone.BLUE,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Retry Update Download", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            AppUpdateDownloadState.Idle -> {
+                                if (isUpdateAvailable && appRelease != null) {
+                                    IcyGlossyButton(
+                                        onClick = onStartUpdateDownload,
+                                        tone = IcyGlossyTone.BLUE,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("about_update_now_button")
+                                    ) {
+                                        Icon(Icons.Filled.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Update Now (ابھی اپڈیٹ کریں)", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            is AppUpdateDownloadState.Downloading -> Unit
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+    }
+}
+
+@Composable
+private fun FactoryIconSilhouette(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Smoke puffs
+        drawCircle(
+            color = Color.White,
+            radius = w * 0.09f,
+            center = Offset(w * 0.72f, h * 0.16f)
+        )
+        drawCircle(
+            color = Color.White,
+            radius = w * 0.065f,
+            center = Offset(w * 0.60f, h * 0.24f)
         )
 
-        BrohiCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "How Direct GitHub Updates Work",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = DeepBlue
-                )
-                Text(
-                    text = "• Every time new code is pushed to GitHub, a signed APK is automatically generated and published to GitHub Releases.\n• All approved users (Super Admin, Admin, Manager & Staff) automatically receive the update popup when a newer build is ready — just tap Update Now.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "گٹ ہب پر نیا کوڈ پش ہوتے ہی ایپ خود بخود تیار ہو کر ریلیز ہو جاتی ہے اور تمام صارفین کے پاس اپڈیٹ کا پاپ اپ آ جاتا ہے۔",
-                    fontSize = 11.5.sp,
-                    color = RoyalBlue,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+        // Chimney
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(w * 0.72f, h * 0.26f),
+            size = Size(w * 0.14f, h * 0.34f),
+            cornerRadius = CornerRadius(4f, 4f)
+        )
+
+        // Main factory building with sawtooth roof
+        val factoryPath = Path().apply {
+            moveTo(w * 0.08f, h * 0.90f)
+            lineTo(w * 0.08f, h * 0.50f)
+            lineTo(w * 0.34f, h * 0.36f)
+            lineTo(w * 0.34f, h * 0.50f)
+            lineTo(w * 0.60f, h * 0.36f)
+            lineTo(w * 0.60f, h * 0.50f)
+            lineTo(w * 0.92f, h * 0.50f)
+            lineTo(w * 0.92f, h * 0.90f)
+            close()
         }
+        drawPath(path = factoryPath, color = Color.White)
+
+        // 3 icy-blue windows inside factory
+        val winColor = Color(0xFF0E6CF5)
+        val winW = w * 0.12f
+        val winH = h * 0.14f
+        val winY = h * 0.64f
+        listOf(0.20f, 0.44f, 0.68f).forEach { xFrac ->
+            drawRoundRect(
+                color = winColor,
+                topLeft = Offset(w * xFrac, winY),
+                size = Size(winW, winH),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+        }
+    }
+}
+
+private fun formatBytesMb(bytes: Long): String {
+    if (bytes <= 0L) return "0.0 MB"
+    val mb = bytes / (1024.0 * 1024.0)
+    return String.format(java.util.Locale.US, "%.1f MB", mb)
+}
+
+private fun formatSpeedLabel(bytesPerSec: Long): String {
+    if (bytesPerSec <= 0L) return "Starting"
+    return if (bytesPerSec >= 1024L * 1024L) {
+        String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSec / (1024.0 * 1024.0))
+    } else {
+        "${(bytesPerSec / 1024L).coerceAtLeast(1L)} KB/s"
+    }
+}
+
+private fun formatEtaLabel(seconds: Long?): String {
+    if (seconds == null || seconds <= 0L) return "Calculating..."
+    return if (seconds < 60L) {
+        "~ $seconds sec"
+    } else {
+        val mins = seconds / 60L
+        val rem = seconds % 60L
+        "~ ${mins}m ${rem}s"
     }
 }
 
@@ -2246,17 +2900,18 @@ private fun AppUpdateChannelCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Button(
+                IcyGlossyButton(
                     onClick = onCheckForUpdates,
                     enabled = !isCheckingUpdate,
-                    colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 15.dp, vertical = 9.dp),
                     modifier = Modifier.testTag("about_check_updates_button")
                 ) {
                     if (isCheckingUpdate) {
                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                     } else {
-                        Text("Check Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Filled.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Check Now", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2296,45 +2951,35 @@ private fun AppUpdateChannelCard(
 
                         when (val st = updateDownloadState) {
                             is AppUpdateDownloadState.Downloading -> {
-                                LinearProgressIndicator(
-                                    progress = { (st.progressPercent / 100f).coerceIn(0f, 1f) },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                    color = SuccessGreen
+                                IcySplashProgressBar(
+                                    progressPercent = st.progressPercent,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                Text("Downloading APK... ${st.progressPercent}%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Downloading APK... ${st.progressPercent}%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = DeepBlue)
                             }
                             is AppUpdateDownloadState.ReadyToInstall -> {
-                                Button(
+                                IcyGlossyButton(
                                     onClick = onInstallOrGrantPermission,
-                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    tone = IcyGlossyTone.GREEN,
                                     modifier = Modifier.fillMaxWidth().testTag("about_install_apk_button")
                                 ) {
                                     Text("Install Downloaded Update (اپڈیٹ انسٹال کریں)", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
-                            is AppUpdateDownloadState.NeedsInstallPermission -> {
-                                Button(
-                                    onClick = onInstallOrGrantPermission,
-                                    colors = ButtonDefaults.buttonColors(containerColor = WarningOrange),
-                                    modifier = Modifier.fillMaxWidth().testTag("about_grant_permission_button")
-                                ) {
-                                    Text("Allow Unknown Apps & Install (اجازت دیں)", color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-                            }
                             is AppUpdateDownloadState.Failed -> {
                                 Text(st.message, fontSize = 11.sp, color = DangerRed, fontWeight = FontWeight.SemiBold)
-                                Button(
+                                IcyGlossyButton(
                                     onClick = onStartUpdateDownload,
-                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    tone = IcyGlossyTone.GREEN,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text("Retry Update Download", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                             AppUpdateDownloadState.Idle -> {
-                                Button(
+                                IcyGlossyButton(
                                     onClick = onStartUpdateDownload,
-                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    tone = IcyGlossyTone.GREEN,
                                     modifier = Modifier.fillMaxWidth().testTag("about_update_now_button")
                                 ) {
                                     Text("Update Now (ابھی اپڈیٹ کریں)", color = Color.White, fontWeight = FontWeight.Bold)
@@ -2348,8 +2993,8 @@ private fun AppUpdateChannelCard(
             if (onOpenFullUpdates != null) {
                 OutlinedButton(
                     onClick = onOpenFullUpdates,
-                    border = BorderStroke(1.dp, RoyalBlue.copy(alpha = 0.45f)),
-                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.2.dp, RoyalBlue.copy(alpha = 0.45f)),
+                    shape = CircleShape,
                     modifier = Modifier.fillMaxWidth().testTag("about_open_updates_screen_button")
                 ) {
                     Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = RoyalBlue, modifier = Modifier.size(16.dp))
@@ -2397,19 +3042,14 @@ fun NoticesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (activeRole.canEditOrDelete) {
-            Button(
+            IcyGlossyButton(
                 onClick = {
                     editingNotice = null
                     showComposer = true
                 },
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(PrimaryBlueGradient)
                     .testTag("add_notice_button")
             ) {
                 Icon(Icons.Filled.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))

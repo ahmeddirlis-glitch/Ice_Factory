@@ -82,6 +82,8 @@ import com.example.ui.theme.DangerRed
 import com.example.ui.theme.DeepBlue
 import com.example.ui.theme.RoyalBlue
 import com.example.ui.theme.SoftBorderDark
+import com.example.ui.theme.SuccessGreen
+import com.example.ui.theme.WarningOrange
 import java.io.File
 
 /**
@@ -244,12 +246,13 @@ fun CrystalFormDialog(
                         if (showDismissButton) {
                             OutlinedButton(
                                 onClick = onDismissRequest,
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, if (darkTheme) SoftBorderDark else CrystalBorderLight),
+                                shape = CircleShape,
+                                border = BorderStroke(1.2.dp, if (darkTheme) SoftBorderDark else CrystalBorderLight),
                                 colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (darkTheme) Color(0xFF13274C) else Color(0xFFF4F9FF),
                                     contentColor = if (darkTheme) Color.White else DeepBlue
                                 ),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                                 modifier = Modifier
                                     .weight(0.42f)
                                     .heightIn(min = 46.dp)
@@ -266,32 +269,22 @@ fun CrystalFormDialog(
                             }
                         }
 
+                        val buttonTone = when {
+                            isDestructive -> IcyGlossyTone.RED
+                            accentColor == SuccessGreen -> IcyGlossyTone.GREEN
+                            accentColor == WarningOrange -> IcyGlossyTone.ORANGE
+                            else -> IcyGlossyTone.BLUE
+                        }
                         val confirmModifier = Modifier
                             .weight(if (showDismissButton) 0.58f else 1f)
                             .heightIn(min = 46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .let {
-                                if (!isDestructive && accentColor == RoyalBlue && confirmEnabled) {
-                                    it.background(PrimaryBlueGradient)
-                                } else {
-                                    it
-                                }
-                            }
                             .let { if (confirmTestTag != null) it.testTag(confirmTestTag) else it }
 
-                        Button(
+                        IcyGlossyButton(
                             onClick = onConfirm,
                             enabled = confirmEnabled,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = when {
-                                    isDestructive -> DangerRed
-                                    accentColor != RoyalBlue -> accentColor
-                                    !confirmEnabled -> RoyalBlue.copy(alpha = 0.45f)
-                                    else -> Color.Transparent
-                                }
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            tone = buttonTone,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                             modifier = confirmModifier
                         ) {
                             Icon(
@@ -501,19 +494,15 @@ fun CrystalFullPhotoViewerDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
+                        IcyGlossyButton(
                             onClick = {
                                 onDismiss()
                                 onTakeCameraPhoto()
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 46.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PrimaryBlueGradient)
                                 .testTag("photo_viewer_camera_button")
                         ) {
                             Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
@@ -526,13 +515,13 @@ fun CrystalFullPhotoViewerDialog(
                                 onDismiss()
                                 onPickFromGallery()
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = CircleShape,
                             border = BorderStroke(1.2.dp, RoyalBlue.copy(alpha = 0.45f)),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (darkTheme) Color(0xFF14284E) else Color.White,
+                                containerColor = if (darkTheme) Color(0xFF14284E) else Color(0xFFF4F9FF),
                                 contentColor = if (darkTheme) Color.White else DeepBlue
                             ),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 46.dp)

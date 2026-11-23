@@ -2305,9 +2305,6 @@ class FactoryViewModel(
                     AppUpdateManager.launchApkInstaller(context, state.apkFile)
                         .onFailure { _toastMessage.value = it.localizedMessage }
                 }
-                is AppUpdateDownloadState.NeedsInstallPermission -> {
-                    _toastMessage.value = "Please enable 'Install unknown apps' to finish updating."
-                }
                 is AppUpdateDownloadState.Failed -> {
                     _toastMessage.value = state.message
                 }
@@ -2321,9 +2318,6 @@ class FactoryViewModel(
             is AppUpdateDownloadState.ReadyToInstall -> {
                 AppUpdateManager.launchApkInstaller(context, st.apkFile)
                     .onFailure { _toastMessage.value = it.localizedMessage }
-            }
-            is AppUpdateDownloadState.NeedsInstallPermission -> {
-                AppUpdateManager.openInstallUnknownAppsSettings(context)
             }
             else -> startApkUpdateDownload(context)
         }

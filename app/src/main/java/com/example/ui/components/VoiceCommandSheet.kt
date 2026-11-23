@@ -295,17 +295,20 @@ fun VoiceCommandBottomSheet(
             )
 
             // Prominent Primary Action Button so users never miss how to process & record typed/spoken text
-            Button(
+            IcyGlossyButton(
                 onClick = submitCurrentInput,
                 enabled = manualInput.isNotBlank() && !voiceUiState.isParsing && !speechState.isListening,
-                colors = ButtonDefaults.buttonColors(containerColor = DeepBlue),
-                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("voice_analyze_action_button")
             ) {
-                Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Filled.Send,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (voiceUiState.autoSaveEnabled) {
@@ -313,6 +316,7 @@ fun VoiceCommandBottomSheet(
                     } else {
                         "Analyze & Open Confirmation (انٹری چیک کریں)"
                     },
+                    color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
