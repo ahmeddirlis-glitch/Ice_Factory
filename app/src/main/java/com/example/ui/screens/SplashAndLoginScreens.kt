@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.ContactPhone
@@ -451,6 +452,10 @@ fun LoginScreen(
     rememberMe: Boolean,
     isSigningIn: Boolean,
     errorMessage: String?,
+    cancelNotice: String? = null,
+    existingSignedInEmail: String? = null,
+    onContinueExistingSession: () -> Unit = {},
+    onDismissError: () -> Unit = {},
     onRememberMeChange: (Boolean) -> Unit,
     onGoogleSignInClick: (emailHint: String) -> Unit,
     onSubmitRegistrationAndSignIn: (registrationJson: String, emailHint: String) -> Unit
@@ -461,6 +466,7 @@ fun LoginScreen(
     var infoHint by remember { mutableStateOf<String?>(null) }
     var showRegisterSheet by remember { mutableStateOf(false) }
     var footerDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var dismissedErrorPopup by remember(errorMessage) { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -597,6 +603,106 @@ fun LoginScreen(
                             color = DeepBlue
                         )
 
+                        if (!errorMessage.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = DangerRed.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, DangerRed.copy(alpha = 0.45f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("login_error_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Warning,
+                                        contentDescription = "Sign-in error",
+                                        tint = DangerRed,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = errorMessage,
+                                        color = DangerRed,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        } else if (!cancelNotice.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = WarningOrange.copy(alpha = 0.10f),
+                                border = BorderStroke(1.dp, WarningOrange.copy(alpha = 0.45f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("login_cancel_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Warning,
+                                        contentDescription = null,
+                                        tint = WarningOrange,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = cancelNotice,
+                                        color = Color(0xFF9A3412),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!existingSignedInEmail.isNullOrBlank()) {
+                            IcyGlossyButton(
+                                onClick = onContinueExistingSession,
+                                enabled = !isSigningIn,
+                                tone = IcyGlossyTone.GREEN,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 52.dp)
+                                    .testTag("continue_existing_session_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(horizontalAlignment = Alignment.Start) {
+                                    Text(
+                                        text = "Continue as $existingSignedInEmail",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "پہلے سے لاگ ان اکاؤنٹ کے ساتھ آگے بڑھیں",
+                                        color = Color(0xFFDCFCE7),
+                                        fontSize = 10.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
                         CrystalTextField(
                             value = emailOrPhone,
                             onValueChange = { emailOrPhone = it },
@@ -677,102 +783,131 @@ fun LoginScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color(0xFFF1F6FF),
-                                    border = BorderStroke(0.8.dp, CrystalBorderLight.copy(alpha = 0.85f)),
-                                    modifier = Modifier.size(30.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Canvas(modifier = Modifier.size(16.dp)) {
-                                            val stroke = 2.7.dp.toPx()
-                                            val arcSize = Size(size.width - stroke, size.height - stroke)
-                                            val arcTopLeft = Offset(stroke / 2f, stroke / 2f)
-                                            // Red top-left/top
-                                            drawArc(
-                                                color = Color(0xFFEA4335),
-                                                startAngle = -155f,
-                                                sweepAngle = 110f,
-                                                useCenter = false,
-                                                topLeft = arcTopLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = stroke, cap = StrokeCap.Butt)
-                                            )
-                                            // Yellow left
-                                            drawArc(
-                                                color = Color(0xFFFBBC05),
-                                                startAngle = 145f,
-                                                sweepAngle = 65f,
-                                                useCenter = false,
-                                                topLeft = arcTopLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = stroke, cap = StrokeCap.Butt)
-                                            )
-                                            // Green bottom
-                                            drawArc(
-                                                color = Color(0xFF34A853),
-                                                startAngle = 35f,
-                                                sweepAngle = 115f,
-                                                useCenter = false,
-                                                topLeft = arcTopLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = stroke, cap = StrokeCap.Butt)
-                                            )
-                                            // Blue right
-                                            drawArc(
-                                                color = Color(0xFF4285F4),
-                                                startAngle = -15f,
-                                                sweepAngle = 55f,
-                                                useCenter = false,
-                                                topLeft = arcTopLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = stroke, cap = StrokeCap.Butt)
-                                            )
-                                            // Horizontal crossbar
-                                            drawLine(
-                                                color = Color(0xFF4285F4),
-                                                start = Offset(center.x, center.y),
-                                                end = Offset(size.width - stroke * 0.25f, center.y),
-                                                strokeWidth = stroke,
-                                                cap = StrokeCap.Round
-                                            )
+                                if (isSigningIn) {
+                                    CircularProgressIndicator(
+                                        color = DeepBlue,
+                                        modifier = Modifier.size(22.dp),
+                                        strokeWidth = 2.4.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = "Signing in with Google...",
+                                            color = DeepBlue,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.5.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "گوگل اکاؤنٹ کی تصدیق ہو رہی ہے",
+                                            color = RoyalBlue,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFFF1F6FF),
+                                        border = BorderStroke(0.8.dp, CrystalBorderLight.copy(alpha = 0.85f)),
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Canvas(modifier = Modifier.size(16.dp)) {
+                                                val stroke = 2.7.dp.toPx()
+                                                val arcSize = Size(size.width - stroke, size.height - stroke)
+                                                val arcTopLeft = Offset(stroke / 2f, stroke / 2f)
+                                                // Red top-left/top
+                                                drawArc(
+                                                    color = Color(0xFFEA4335),
+                                                    startAngle = -155f,
+                                                    sweepAngle = 110f,
+                                                    useCenter = false,
+                                                    topLeft = arcTopLeft,
+                                                    size = arcSize,
+                                                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                                                )
+                                                // Yellow left
+                                                drawArc(
+                                                    color = Color(0xFFFBBC05),
+                                                    startAngle = 145f,
+                                                    sweepAngle = 65f,
+                                                    useCenter = false,
+                                                    topLeft = arcTopLeft,
+                                                    size = arcSize,
+                                                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                                                )
+                                                // Green bottom
+                                                drawArc(
+                                                    color = Color(0xFF34A853),
+                                                    startAngle = 35f,
+                                                    sweepAngle = 115f,
+                                                    useCenter = false,
+                                                    topLeft = arcTopLeft,
+                                                    size = arcSize,
+                                                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                                                )
+                                                // Blue right
+                                                drawArc(
+                                                    color = Color(0xFF4285F4),
+                                                    startAngle = -15f,
+                                                    sweepAngle = 55f,
+                                                    useCenter = false,
+                                                    topLeft = arcTopLeft,
+                                                    size = arcSize,
+                                                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                                                )
+                                                // Horizontal crossbar
+                                                drawLine(
+                                                    color = Color(0xFF4285F4),
+                                                    start = Offset(center.x, center.y),
+                                                    end = Offset(size.width - stroke * 0.25f, center.y),
+                                                    strokeWidth = stroke,
+                                                    cap = StrokeCap.Round
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = "Continue with Google",
-                                        color = DeepBlue,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "گوگل لاگ ان",
-                                        color = RoyalBlue,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 11.5.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = if (existingSignedInEmail.isNullOrBlank()) {
+                                                "Continue with Google"
+                                            } else {
+                                                "Use Another Google Account"
+                                            },
+                                            color = DeepBlue,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (existingSignedInEmail.isNullOrBlank()) {
+                                                "گوگل لاگ ان"
+                                            } else {
+                                                "دوسرا گوگل اکاؤنٹ منتخب کریں"
+                                            },
+                                            color = RoyalBlue,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.5.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        if (!errorMessage.isNullOrBlank()) {
-                            Text(
-                                text = errorMessage,
-                                color = DangerRed,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
                         if (!infoHint.isNullOrBlank()) {
                             Text(
                                 text = infoHint!!,
@@ -1325,6 +1460,17 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
+    }
+
+    if (!dismissedErrorPopup && !errorMessage.isNullOrBlank()) {
+        ValidationPopupDialog(
+            title = "Google Sign-In Issue (لاگ ان مسئلہ)",
+            message = errorMessage,
+            onDismiss = {
+                dismissedErrorPopup = true
+                onDismissError()
+            }
+        )
     }
 }
 

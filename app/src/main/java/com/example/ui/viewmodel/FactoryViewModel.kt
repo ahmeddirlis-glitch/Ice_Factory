@@ -38,6 +38,7 @@ import com.example.data.model.SupplierItem
 import com.example.data.model.UserProfile
 import com.example.data.model.UserRole
 import com.example.data.model.UtilityReading
+import com.example.data.model.VoiceConversationTurn
 import com.example.data.model.canUserEnterMainWorkspace
 import com.example.data.model.evaluateFaceEnrollmentGate
 import com.example.data.model.isAppUpdateAvailable
@@ -105,6 +106,10 @@ data class VoiceUiState(
     val isSaving: Boolean = false,
     val lastNormalizedTranscript: String? = null,
     val pendingIntents: List<ParsedVoiceIntent> = emptyList(),
+    val pendingDraft: ParsedVoiceIntent? = null,
+    val awaitingField: String = "",
+    val lastReplyLang: String = "en",
+    val conversationTurns: List<VoiceConversationTurn> = emptyList(),
     val spokenAnswer: String? = null,
     val pendingNavigationKey: String? = null,
     val errorMessage: String? = null
@@ -2365,62 +2370,195 @@ class FactoryViewModel(
         }
     }
 
-    // --- Voice Command Pipeline ---
+    // --- Voice Command Pipeline & Wake Assistant ---
+    fun setHeyIceWakeEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferencesManager.setHeyIceWakeEnabled(enabled) }
+    }
+
+    fun setVoiceWakeLang(tag: String) {
+        viewModelScope.launch { preferencesManager.setVoiceWakeLang(tag) }
+    }
+
     fun setVoiceAutoSave(enabled: Boolean) {
         _voiceState.value = _voiceState.value.copy(autoSaveEnabled = enabled)
+    }
+
+    fun startWakeGreeting(
+        userName: String,
+        preferredLocaleTag: String,
+        onSpeak: (text: String, lang: String, reopenMic: Boolean) -> Unit
+    ) {
+        val firstName = userName.trim().substringBefore(" ").ifBlank { userName.ifBlank { "Sir" } }
+        val lang = when {
+            preferredLocaleTag.startsWith("hi", ignoreCase = true) -> "hi"
+            preferredLocaleTag.startsWith("ur", ignoreCase = true) -> "ur"
+            else -> "en"
+        }
+        val greeting = when (lang) {
+            "ur" -> "جی $firstName، حکم کریں! میں سن رہا ہوں۔"
+            "hi" -> "जी $firstName, बोलिए! मैं सुन रहा हूँ।"
+            else -> "Yes $firstName, I'm listening! How can I help?"
+        }
+        val currentAutoSave = _voiceState.value.autoSaveEnabled
+        _voiceState.value = VoiceUiState(
+            autoSaveEnabled = currentAutoSave,
+            lastReplyLang = lang,
+            spokenAnswer = greeting,
+            conversationTurns = listOf(
+                VoiceConversationTurn(
+                    isUser = false,
+                    text = greeting,
+                    language = lang
+                )
+            )
+        )
+        onSpeak(greeting, lang, true)
     }
 
     fun parseVoiceTranscript(
         transcript: String,
         isOnline: Boolean = true,
-        onSpeak: (String) -> Unit
+        preferredLocaleTag: String = "ur-PK",
+        userName: String = currentUserName,
+        onSpeak: (text: String, lang: String, reopenMic: Boolean) -> Unit
     ) = viewModelScope.launch {
-        val currentAutoSave = _voiceState.value.autoSaveEnabled
+        val prevState = _voiceState.value
+        val currentAutoSave = prevState.autoSaveEnabled
         val normalized = PakistaniFormatters.normalizeVoiceTranscript(transcript)
-        _voiceState.value = VoiceUiState(
+        if (normalized.isBlank()) return@launch
+
+        val userLang = VoiceAiRepository.detectLanguage(transcript, preferredLocaleTag)
+        val updatedHistory = (prevState.conversationTurns + VoiceConversationTurn(
+            isUser = true,
+            text = transcript.trim(),
+            language = userLang
+        )).takeLast(16)
+
+        _voiceState.value = prevState.copy(
             isParsing = true,
-            autoSaveEnabled = currentAutoSave,
-            lastNormalizedTranscript = normalized
+            lastNormalizedTranscript = normalized,
+            conversationTurns = updatedHistory,
+            errorMessage = null
         )
+
         val role = activeRole.value
-        val result = voiceAiRepository.parseTranscript(
-            transcript = normalized,
+        val defaultRate = settings.value.iceBlockRate.takeIf { it > 0 } ?: 1200.0
+        val contextSummary = buildLiveVoiceContextSummary(role)
+
+        val assistantResult = voiceAiRepository.converseWithAssistant(
+            transcript = transcript,
             activeRole = role,
+            userName = userName,
+            preferredLocaleTag = preferredLocaleTag,
+            defaultBlockRate = defaultRate,
+            factoryContextSummary = contextSummary,
+            history = updatedHistory,
+            pendingDraft = prevState.pendingDraft,
+            awaitingField = prevState.awaitingField,
             allowRemoteAi = isOnline
         )
-        result.onSuccess { intents ->
-            val single = intents.firstOrNull()
-            if (intents.size == 1 && single != null && single.intentType == "NAVIGATE") {
-                val target = single.targetScreen.ifBlank { "dashboard" }
+
+        val replyLang = assistantResult.replyLanguage.ifBlank { userLang }
+
+        when (assistantResult.mode) {
+            "CLARIFY" -> {
+                val question = assistantResult.spokenReply
+                val nextTurns = (updatedHistory + VoiceConversationTurn(
+                    isUser = false,
+                    text = question,
+                    language = replyLang,
+                    isClarificationQuestion = true
+                )).takeLast(16)
+                _voiceState.value = VoiceUiState(
+                    isParsing = false,
+                    autoSaveEnabled = currentAutoSave,
+                    lastNormalizedTranscript = normalized,
+                    pendingDraft = assistantResult.pendingDraft,
+                    awaitingField = assistantResult.missingField,
+                    lastReplyLang = replyLang,
+                    conversationTurns = nextTurns,
+                    spokenAnswer = question
+                )
+                onSpeak(question, replyLang, true)
+            }
+            "NAVIGATE" -> {
+                val target = assistantResult.intents.firstOrNull()?.targetScreen?.ifBlank { "dashboard" } ?: "dashboard"
                 if (!AppRoute.isAllowedFor(role, target)) {
-                    val denied = "Access denied: That module is restricted for ${role.label}."
+                    val denied = when (replyLang) {
+                        "ur" -> "معاف کیجیے، آپ کے رول کو یہ سیکشن کھولنے کی اجازت نہیں ہے۔"
+                        "hi" -> "माफ़ कीजिए, आपके रोल को यह सेक्शन खोलने की अनुमति नहीं है।"
+                        else -> "Access denied: That module is restricted for ${role.label}."
+                    }
+                    val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = denied, language = replyLang)).takeLast(16)
                     _voiceState.value = VoiceUiState(
                         autoSaveEnabled = currentAutoSave,
                         lastNormalizedTranscript = normalized,
+                        lastReplyLang = replyLang,
+                        conversationTurns = nextTurns,
                         spokenAnswer = denied
                     )
-                    onSpeak(denied)
+                    onSpeak(denied, replyLang, false)
                 } else {
-                    val msg = single.spokenReply.ifBlank { "Opening $target." }
+                    val msg = assistantResult.spokenReply.ifBlank { "Opening ${target.replace('_', ' ')}." }
+                    val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = msg, language = replyLang)).takeLast(16)
                     _voiceState.value = VoiceUiState(
                         autoSaveEnabled = currentAutoSave,
                         lastNormalizedTranscript = normalized,
+                        lastReplyLang = replyLang,
+                        conversationTurns = nextTurns,
                         spokenAnswer = msg,
                         pendingNavigationKey = target
                     )
-                    onSpeak(msg)
+                    onSpeak(msg, replyLang, false)
                 }
-            } else if (intents.size == 1 && single != null && single.intentType == "QUERY") {
-                val answer = answerVoiceQuery(single, role)
-                val nav = single.targetScreen.takeIf { it.isNotBlank() && AppRoute.isAllowedFor(role, it) }
+            }
+            "DENIED" -> {
+                val denied = assistantResult.spokenReply
+                val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = denied, language = replyLang)).takeLast(16)
                 _voiceState.value = VoiceUiState(
                     autoSaveEnabled = currentAutoSave,
                     lastNormalizedTranscript = normalized,
+                    lastReplyLang = replyLang,
+                    conversationTurns = nextTurns,
+                    spokenAnswer = denied
+                )
+                onSpeak(denied, replyLang, false)
+            }
+            "ANSWER" -> {
+                val firstQuery = assistantResult.intents.firstOrNull()
+                val answer = if (firstQuery != null && firstQuery.intentType == "QUERY" && firstQuery.queryType.isNotBlank() && firstQuery.queryType != "general") {
+                    answerVoiceQuery(firstQuery, role).ifBlank { assistantResult.spokenReply }
+                } else {
+                    assistantResult.spokenReply
+                }
+                val nav = firstQuery?.targetScreen?.takeIf { it.isNotBlank() && AppRoute.isAllowedFor(role, it) }
+                val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = answer, language = replyLang)).takeLast(16)
+                _voiceState.value = VoiceUiState(
+                    autoSaveEnabled = currentAutoSave,
+                    lastNormalizedTranscript = normalized,
+                    lastReplyLang = replyLang,
+                    conversationTurns = nextTurns,
                     spokenAnswer = answer,
                     pendingNavigationKey = nav
                 )
-                onSpeak(answer)
-            } else {
+                onSpeak(answer, replyLang, assistantResult.shouldReopenMic)
+            }
+            else -> { // EXECUTE
+                val intents = assistantResult.intents
+                if (intents.isEmpty()) {
+                    val fallbackMsg = assistantResult.spokenReply.ifBlank { "Could not understand command." }
+                    val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = fallbackMsg, language = replyLang)).takeLast(16)
+                    _voiceState.value = VoiceUiState(
+                        autoSaveEnabled = currentAutoSave,
+                        lastNormalizedTranscript = normalized,
+                        lastReplyLang = replyLang,
+                        conversationTurns = nextTurns,
+                        spokenAnswer = fallbackMsg
+                    )
+                    onSpeak(fallbackMsg, replyLang, true)
+                    return@launch
+                }
+
                 val blockedByStaff = role == UserRole.STAFF
                 val blockedByOwner = intents.any {
                     !role.isOwner && (it.intentType == "FUNDING" || it.intentType == "FACTORY_BUILD" ||
@@ -2432,62 +2570,96 @@ class FactoryViewModel(
                     } else {
                         "Access restricted: Funding and Factory Build entries are available to Super Admin only."
                     }
+                    val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = denied, language = replyLang)).takeLast(16)
                     _voiceState.value = VoiceUiState(
                         autoSaveEnabled = currentAutoSave,
                         lastNormalizedTranscript = normalized,
+                        lastReplyLang = replyLang,
+                        conversationTurns = nextTurns,
                         spokenAnswer = denied
                     )
-                    onSpeak(denied)
+                    onSpeak(denied, "en", false)
                 } else if (currentAutoSave) {
                     runCatching {
                         saveIntentsInternal(intents)
                     }.onSuccess { doneMsg ->
+                        val spokenSuccess = when (replyLang) {
+                            "ur" -> "انٹری کامیابی سے محفوظ ہو گئی ہے!"
+                            "hi" -> "एंट्री सफलतापूर्वक सेव हो गई है!"
+                            else -> doneMsg.replace("✓ ", "")
+                        }
+                        val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = doneMsg, language = replyLang)).takeLast(16)
                         _voiceState.value = VoiceUiState(
                             autoSaveEnabled = true,
                             lastNormalizedTranscript = normalized,
+                            lastReplyLang = replyLang,
+                            conversationTurns = nextTurns,
                             spokenAnswer = doneMsg
                         )
                         _toastMessage.value = doneMsg
-                        onSpeak(doneMsg)
+                        onSpeak(spokenSuccess, replyLang, false)
                     }.onFailure { saveErr ->
                         val msg = "Detected command but save failed: ${saveErr.localizedMessage ?: "Retry"}"
                         _voiceState.value = VoiceUiState(
                             autoSaveEnabled = currentAutoSave,
                             lastNormalizedTranscript = normalized,
+                            lastReplyLang = replyLang,
+                            conversationTurns = updatedHistory,
                             pendingIntents = intents,
                             errorMessage = msg
                         )
                     }
                 } else {
-                    val readBack = intents.joinToString(". ") { intent ->
-                        val amtSpoken = if (intent.amount > 0) PakistaniFormatters.speakablePkr(intent.amount) else ""
-                        when (intent.intentType) {
-                            "SALE" -> "Cash ice sale, $amtSpoken"
-                            "CREDIT_SALE" -> "Credit sale to ${intent.customerOrSourceName.ifBlank { "Customer" }}, $amtSpoken"
-                            "CREDIT_PAYMENT" -> "Credit payment received from ${intent.customerOrSourceName.ifBlank { "Customer" }}, $amtSpoken"
-                            "EXPENSE" -> "${intent.category.ifBlank { "Other" }} expense, $amtSpoken"
-                            "FUNDING" -> "Funding from ${intent.customerOrSourceName.ifBlank { intent.category }}, $amtSpoken"
-                            "FACTORY_BUILD" -> "Factory build capital expense, $amtSpoken"
-                            "PRODUCTION" -> "Production ${PakistaniFormatters.formatTons(intent.tons)}"
-                            else -> intent.description
-                        }
-                    } + ". Please confirm."
+                    val readBack = assistantResult.spokenReply.ifBlank {
+                        intents.joinToString(". ") { intent ->
+                            val amtSpoken = if (intent.amount > 0) PakistaniFormatters.speakablePkr(intent.amount) else ""
+                            when (intent.intentType) {
+                                "SALE" -> if (intent.quantity > 0) "Cash ice sale of ${intent.quantity} blocks, $amtSpoken" else "Cash ice sale, $amtSpoken"
+                                "CREDIT_SALE" -> "Credit sale to ${intent.customerOrSourceName.ifBlank { "Customer" }}, $amtSpoken"
+                                "CREDIT_PAYMENT" -> "Credit payment received from ${intent.customerOrSourceName.ifBlank { "Customer" }}, $amtSpoken"
+                                "EXPENSE" -> "${intent.category.ifBlank { "Other" }} expense, $amtSpoken"
+                                "FUNDING" -> "Funding from ${intent.customerOrSourceName.ifBlank { intent.category }}, $amtSpoken"
+                                "FACTORY_BUILD" -> "Factory build capital expense, $amtSpoken"
+                                "PRODUCTION" -> "Production ${PakistaniFormatters.formatTons(intent.tons)}"
+                                else -> intent.description
+                            }
+                        } + ". Please confirm."
+                    }
+                    val nextTurns = (updatedHistory + VoiceConversationTurn(isUser = false, text = readBack, language = replyLang)).takeLast(16)
                     _voiceState.value = VoiceUiState(
                         autoSaveEnabled = false,
                         lastNormalizedTranscript = normalized,
+                        lastReplyLang = replyLang,
+                        conversationTurns = nextTurns,
                         pendingIntents = intents,
                         spokenAnswer = readBack
                     )
-                    onSpeak(readBack)
+                    onSpeak(readBack, replyLang, false)
                 }
             }
-        }.onFailure { err ->
-            val msg = err.localizedMessage ?: "Could not process voice command"
-            _voiceState.value = VoiceUiState(
-                autoSaveEnabled = currentAutoSave,
-                lastNormalizedTranscript = normalized,
-                errorMessage = msg
-            )
+        }
+    }
+
+    private fun buildLiveVoiceContextSummary(role: UserRole): String {
+        val metrics = dashboardMetrics.value
+        val accounting = ownerAccountingSummary.value
+        val activeNotices = notices.value.filter { it.active }
+        return buildString {
+            appendLine("Today Date: ${PakistaniFormatters.todayIso()}")
+            appendLine("Ice Stock: ${metrics.totalStockTons} Tons")
+            appendLine("Staff Present Today: ${metrics.staffPresentCount}/${metrics.totalStaffCount}")
+            appendLine("Active Notices: ${activeNotices.firstOrNull()?.let { "${it.title} (${it.message})" } ?: "None"}")
+            if (role != UserRole.STAFF) {
+                appendLine("Today Sales: Rs. ${metrics.todaySales.toLong()}")
+                appendLine("Month Expenses: Rs. ${metrics.monthExpensesTotal.toLong()}")
+                appendLine("Customers Pending Credit: Rs. ${accounting.creditPendingFromCustomers.toLong()}")
+            }
+            if (role.isOwner) {
+                appendLine("Total Sales So Far: Rs. ${accounting.totalSalesSoFar.toLong()}")
+                appendLine("Regular Profit So Far: Rs. ${accounting.regularProfitSoFar.toLong()}")
+                appendLine("Still To Repay Loan: Rs. ${accounting.stillToRepay.toLong()}")
+                appendLine("Break-even Recovery: ${accounting.recoveryPercent.roundToInt()}%")
+            }
         }
     }
 
@@ -2569,7 +2741,7 @@ class FactoryViewModel(
         )
     }
 
-    fun confirmAndSavePendingIntents(onSpeak: (String) -> Unit) = viewModelScope.launch {
+    fun confirmAndSavePendingIntents(onSpeak: (text: String, lang: String) -> Unit) = viewModelScope.launch {
         val state = _voiceState.value
         val pending = state.pendingIntents
         if (pending.isEmpty() || state.isSaving) return@launch
@@ -2587,17 +2759,30 @@ class FactoryViewModel(
             return@launch
         }
         val currentAutoSave = state.autoSaveEnabled
+        val replyLang = state.lastReplyLang
         _voiceState.value = state.copy(isSaving = true, errorMessage = null)
         runCatching {
             saveIntentsInternal(pending)
         }.onSuccess { doneMsg ->
+            val nextTurns = (state.conversationTurns + VoiceConversationTurn(
+                isUser = false,
+                text = doneMsg,
+                language = replyLang
+            )).takeLast(16)
             _voiceState.value = VoiceUiState(
                 autoSaveEnabled = currentAutoSave,
                 isSaving = false,
+                lastReplyLang = replyLang,
+                conversationTurns = nextTurns,
                 spokenAnswer = doneMsg
             )
             _toastMessage.value = doneMsg
-            onSpeak(doneMsg)
+            val spokenConfirm = when (replyLang) {
+                "ur" -> "شکریہ! انٹری کامیابی سے محفوظ کر دی گئی ہے۔"
+                "hi" -> "धन्यवाद! एंट्री सफलतापूर्वक सेव कर दी गई है।"
+                else -> doneMsg.replace("✓ ", "")
+            }
+            onSpeak(spokenConfirm, replyLang)
         }.onFailure { err ->
             _voiceState.value = _voiceState.value.copy(
                 isSaving = false,
@@ -2613,7 +2798,12 @@ class FactoryViewModel(
             val formattedAmt = PakistaniFormatters.formatPkr(intent.amount)
             when (intent.intentType) {
                 "SALE" -> {
-                    val qty = (intent.amount / rate).toLong().coerceAtLeast(1L)
+                    val qty = if (intent.quantity > 0L) intent.quantity else (intent.amount / rate).toLong().coerceAtLeast(1L)
+                    val unitRate = if (intent.quantity > 0L && intent.amount > 0.0) {
+                        intent.amount / qty.toDouble()
+                    } else {
+                        rate
+                    }
                     repository.createSale(
                         factoryId = activeFactoryId,
                         callerUid = currentUserId,
@@ -2621,19 +2811,25 @@ class FactoryViewModel(
                         customerName = intent.customerOrSourceName.ifBlank { "Cash Customer" },
                         product = "Ice Blocks (10kg)",
                         quantity = qty,
-                        unitPrice = rate,
+                        unitPrice = unitRate,
                         total = intent.amount,
                         paid = true,
                         source = "voice"
                     )
-                    receiptLines.add("✓ Added to Sales (Income): $formattedAmt")
+                    val rateTxt = PakistaniFormatters.formatPkr(unitRate)
+                    receiptLines.add("✓ Added to Sales: $formattedAmt ($qty blocks @ $rateTxt/block)")
                 }
                 "CREDIT_SALE" -> {
                     val custName = intent.customerOrSourceName.ifBlank { "Credit Customer" }
                     val existingCust = customers.value.firstOrNull {
                         it.name.contains(custName, ignoreCase = true)
                     }
-                    val qty = (intent.amount / rate).toLong().coerceAtLeast(1L)
+                    val qty = if (intent.quantity > 0L) intent.quantity else (intent.amount / rate).toLong().coerceAtLeast(1L)
+                    val unitRate = if (intent.quantity > 0L && intent.amount > 0.0) {
+                        intent.amount / qty.toDouble()
+                    } else {
+                        rate
+                    }
                     repository.createSale(
                         factoryId = activeFactoryId,
                         callerUid = currentUserId,
@@ -2641,12 +2837,13 @@ class FactoryViewModel(
                         customerName = existingCust?.name ?: custName,
                         product = "Ice Blocks (10kg)",
                         quantity = qty,
-                        unitPrice = rate,
+                        unitPrice = unitRate,
                         total = intent.amount,
                         paid = false,
                         source = "voice"
                     )
-                    receiptLines.add("✓ Added Credit Sale (${existingCust?.name ?: custName}): $formattedAmt")
+                    val rateTxt = PakistaniFormatters.formatPkr(unitRate)
+                    receiptLines.add("✓ Added Credit Sale (${existingCust?.name ?: custName}): $formattedAmt ($qty blocks @ $rateTxt/block)")
                 }
                 "CREDIT_PAYMENT" -> {
                     val custName = intent.customerOrSourceName.trim()

@@ -23,7 +23,9 @@ data class AppPreferences(
     val aiAuditEnabled: Boolean = false,
     val aiAuditAutoWatch: Boolean = true,
     val aiAuditExplainLanguage: String = "ur",
-    val aiAuditFindingsJson: String = ""
+    val aiAuditFindingsJson: String = "",
+    val heyIceWakeEnabled: Boolean = false,
+    val voiceWakeLang: String = "ur-PK"
 )
 
 class PreferencesManager(private val context: Context) {
@@ -39,6 +41,8 @@ class PreferencesManager(private val context: Context) {
         val AI_AUDIT_AUTO_WATCH = booleanPreferencesKey("ai_audit_auto_watch")
         val AI_AUDIT_EXPLAIN_LANG = stringPreferencesKey("ai_audit_explain_lang")
         val AI_AUDIT_FINDINGS_JSON = stringPreferencesKey("ai_audit_findings_json")
+        val HEY_ICE_WAKE_ENABLED = booleanPreferencesKey("hey_ice_wake_enabled")
+        val VOICE_WAKE_LANG = stringPreferencesKey("voice_wake_lang")
     }
 
     val preferencesFlow: Flow<AppPreferences> = context.dataStore.data.map { prefs ->
@@ -52,7 +56,9 @@ class PreferencesManager(private val context: Context) {
             aiAuditEnabled = prefs[Keys.AI_AUDIT_ENABLED] ?: false,
             aiAuditAutoWatch = prefs[Keys.AI_AUDIT_AUTO_WATCH] ?: true,
             aiAuditExplainLanguage = prefs[Keys.AI_AUDIT_EXPLAIN_LANG] ?: "ur",
-            aiAuditFindingsJson = prefs[Keys.AI_AUDIT_FINDINGS_JSON] ?: ""
+            aiAuditFindingsJson = prefs[Keys.AI_AUDIT_FINDINGS_JSON] ?: "",
+            heyIceWakeEnabled = prefs[Keys.HEY_ICE_WAKE_ENABLED] ?: false,
+            voiceWakeLang = prefs[Keys.VOICE_WAKE_LANG] ?: "ur-PK"
         )
     }
 
@@ -100,5 +106,13 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setAiAuditFindingsJson(json: String) {
         context.dataStore.edit { it[Keys.AI_AUDIT_FINDINGS_JSON] = json }
+    }
+
+    suspend fun setHeyIceWakeEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.HEY_ICE_WAKE_ENABLED] = enabled }
+    }
+
+    suspend fun setVoiceWakeLang(langTag: String) {
+        context.dataStore.edit { it[Keys.VOICE_WAKE_LANG] = langTag }
     }
 }

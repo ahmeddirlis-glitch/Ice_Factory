@@ -456,11 +456,34 @@ data class ParsedVoiceIntent(
     val category: String = "",
     val description: String = "",
     val amount: Double = 0.0,
+    val quantity: Long = 0L,
+    val unitPrice: Double = 0.0,
     val tons: Double = 0.0,
     val customerOrSourceName: String = "",
     val targetScreen: String = "",
     val queryType: String = "",
-    val spokenReply: String = ""
+    val spokenReply: String = "",
+    val missingField: String = "", // e.g. "blocks", "amount", "customer", "category"
+    val detectedLang: String = "en" // "en", "hi", "ur"
+)
+
+data class VoiceConversationTurn(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val isUser: Boolean,
+    val text: String,
+    val language: String = "en",
+    val isClarificationQuestion: Boolean = false
+)
+
+data class VoiceAssistantResult(
+    val mode: String, // "CLARIFY", "ANSWER", "NAVIGATE", "EXECUTE", "DENIED"
+    val replyLanguage: String = "en", // "en", "hi", "ur"
+    val spokenReply: String,
+    val displayReply: String = spokenReply,
+    val intents: List<ParsedVoiceIntent> = emptyList(),
+    val missingField: String = "",
+    val pendingDraft: ParsedVoiceIntent? = null,
+    val shouldReopenMic: Boolean = false
 )
 
 @IgnoreExtraProperties

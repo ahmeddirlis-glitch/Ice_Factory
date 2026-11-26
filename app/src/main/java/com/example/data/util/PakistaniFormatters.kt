@@ -130,45 +130,47 @@ object PakistaniFormatters {
         '۵' to '5', '۶' to '6', '۷' to '7', '۸' to '8', '۹' to '9',
         '٠' to '0', '١' to '1', '٢' to '2', '٣' to '3', '٤' to '4',
         '٥' to '5', '٦' to '6', '٧' to '7', '٨' to '8', '٩' to '9',
+        '०' to '0', '१' to '1', '२' to '2', '३' to '3', '४' to '4',
+        '५' to '5', '६' to '6', '७' to '7', '८' to '8', '९' to '9',
         '٬' to ',', '،' to ' '
     )
 
     private val URDU_NUMBER_WORDS = mapOf(
-        "aik" to "1", "ek" to "1", "ایک" to "1",
-        "do" to "2", "دو" to "2",
-        "teen" to "3", "تین" to "3",
-        "chaar" to "4", "char" to "4", "چار" to "4",
-        "paanch" to "5", "panch" to "5", "پانچ" to "5",
-        "chay" to "6", "cheh" to "6", "چھ" to "6",
-        "saat" to "7", "sat" to "7", "سات" to "7",
-        "aath" to "8", "ath" to "8", "آٹھ" to "8",
-        "nau" to "9", "نو" to "9",
-        "das" to "10", "دس" to "10",
-        "gyarah" to "11", "گیارہ" to "11",
-        "barah" to "12", "بارہ" to "12",
-        "terah" to "13", "تیرہ" to "13",
-        "chaudah" to "14", "چودہ" to "14",
-        "pandrah" to "15", "پندرہ" to "15",
-        "solah" to "16", "سولہ" to "16",
-        "satrah" to "17", "سترہ" to "17",
-        "atharah" to "18", "اٹھارہ" to "18",
-        "unnees" to "19", "انیس" to "19",
-        "bees" to "20", "بیس" to "20",
-        "pachis" to "25", "pachees" to "25", "پچیس" to "25",
-        "tees" to "30", "تیس" to "30",
-        "paintees" to "35", "پینتیس" to "35",
-        "chalis" to "40", "چالیس" to "40",
-        "pachaas" to "50", "pachas" to "50", "پچاس" to "50",
-        "pachpan" to "55", "پچپن" to "55",
-        "saath" to "60", "sath" to "60", "ساٹھ" to "60",
-        "painsath" to "65", "پینسٹھ" to "65",
-        "sattar" to "70", "ستر" to "70",
-        "pachattar" to "75", "پچھتر" to "75",
-        "assi" to "80", "اسی" to "80",
-        "nabbe" to "90", "نوے" to "90",
-        "sau" to "100", "سو" to "100",
-        "dedh" to "1.5", "ڈیڑھ" to "1.5",
-        "dhai" to "2.5", "ڈھائی" to "2.5"
+        "aik" to "1", "ek" to "1", "ایک" to "1", "एक" to "1",
+        "do" to "2", "دو" to "2", "दो" to "2",
+        "teen" to "3", "تین" to "3", "तीन" to "3",
+        "chaar" to "4", "char" to "4", "چار" to "4", "चार" to "4",
+        "paanch" to "5", "panch" to "5", "پانچ" to "5", "पांच" to "5", "पाँच" to "5",
+        "chay" to "6", "cheh" to "6", "چھ" to "6", "छह" to "6",
+        "saat" to "7", "sat" to "7", "سات" to "7", "सात" to "7",
+        "aath" to "8", "ath" to "8", "آٹھ" to "8", "आठ" to "8",
+        "nau" to "9", "نو" to "9", "नौ" to "9",
+        "das" to "10", "دس" to "10", "दस" to "10",
+        "gyarah" to "11", "گیارہ" to "11", "ग्यारह" to "11",
+        "barah" to "12", "بارہ" to "12", "बारह" to "12",
+        "terah" to "13", "تیرہ" to "13", "तेरह" to "13",
+        "chaudah" to "14", "چودہ" to "14", "चौदह" to "14",
+        "pandrah" to "15", "پندرہ" to "15", "पंद्रह" to "15",
+        "solah" to "16", "سولہ" to "16", "सोलह" to "16",
+        "satrah" to "17", "سترہ" to "17", "सत्रह" to "17",
+        "atharah" to "18", "اٹھارہ" to "18", "अठारह" to "18",
+        "unnees" to "19", "انیس" to "19", "उन्नीस" to "19",
+        "bees" to "20", "بیس" to "20", "बीस" to "20",
+        "pachis" to "25", "pachees" to "25", "پچیس" to "25", "पच्चीस" to "25",
+        "tees" to "30", "تیس" to "30", "तीस" to "30",
+        "paintees" to "35", "پینتیس" to "35", "पैंतीस" to "35",
+        "chalis" to "40", "چالیس" to "40", "चालीस" to "40",
+        "pachaas" to "50", "pachas" to "50", "پچاس" to "50", "पचास" to "50",
+        "pachpan" to "55", "پچپن" to "55", "पचपन" to "55",
+        "saath" to "60", "sath" to "60", "ساٹھ" to "60", "साठ" to "60",
+        "painsath" to "65", "پینسٹھ" to "65", "पैंसठ" to "65",
+        "sattar" to "70", "ستر" to "70", "सत्तर" to "70",
+        "pachattar" to "75", "پچھتر" to "75", "पचहत्तर" to "75",
+        "assi" to "80", "اسی" to "80", "अस्सी" to "80",
+        "nabbe" to "90", "نوے" to "90", "नब्बे" to "90",
+        "sau" to "100", "سو" to "100", "सौ" to "100",
+        "dedh" to "1.5", "ڈیڑھ" to "1.5", "डेढ़" to "1.5",
+        "dhai" to "2.5", "ڈھائی" to "2.5", "ढाई" to "2.5"
     )
 
     fun convertUrduDigits(input: String): String {
@@ -181,34 +183,41 @@ object PakistaniFormatters {
     }
 
     /**
-     * Converts Urdu/Arabic digits, Urdu number words + multipliers (ہزار / hazar / لاکھ / lakh / کروڑ / crore),
-     * and raw currency amounts like "75000" or "75 ہزار" into normalized "Rs. 75,000" display format.
+     * Converts Urdu/Hindi/Arabic digits, Urdu/Hindi number words + multipliers (ہزار / हजार / hazar / لاکھ / लाख / lakh / کروڑ / करोड़ / crore),
+     * and raw currency amounts like "75000" or "75 ہزار" into normalized "Rs. 75,000" display format,
+     * while preserving unit counts like "15 blocks" or "50 بلاکس".
      */
     fun normalizeVoiceTranscript(raw: String): String {
         if (raw.isBlank()) return ""
         var text = convertUrduDigits(raw).trim()
 
-        // Replace standalone Urdu number words followed by a multiplier (e.g., "پچھتر ہزار" -> "75 ہزار")
+        // Replace standalone Urdu/Hindi number words followed by a multiplier (e.g., "پچھتر ہزار" -> "75 ہزار")
         URDU_NUMBER_WORDS.forEach { (word, digit) ->
-            val pattern = Regex("(?<=^|\\s)${Regex.escape(word)}(?=\\s*(?:ہزار|لاکھ|کروڑ|hazar|hazaar|thousand|lakh|lac|crore|karor))", RegexOption.IGNORE_CASE)
+            val pattern = Regex("(?<=^|\\s)${Regex.escape(word)}(?=\\s*(?:ہزار|لاکھ|کروڑ|हज़ार|हजार|लाख|करोड़|hazar|hazaar|thousand|lakh|lac|crore|karor))", RegexOption.IGNORE_CASE)
+            text = pattern.replace(text, digit)
+        }
+
+        // Replace standalone Urdu/Hindi number words followed by blocks/tons
+        URDU_NUMBER_WORDS.forEach { (word, digit) ->
+            val pattern = Regex("(?<=^|\\s)${Regex.escape(word)}(?=\\s*(?:block|blocks|بلاک|بلاکس|ब्लॉक|ब्लॉक्स|ton|tons|ٹن|टन))", RegexOption.IGNORE_CASE)
             text = pattern.replace(text, digit)
         }
 
         // Handle "Rs." / "Rs" already before a multiplied phrase like "Rs 75 ہزار" -> "75 ہزار" first so we don't duplicate "Rs."
-        text = text.replace(Regex("(?i)(?:rs\\.?|pkr)\\s*(?=[0-9])"), "RS_MARKER ")
+        text = text.replace(Regex("(?i)(?:rs\\.?|pkr|₹)\\s*(?=[0-9])"), "RS_MARKER ")
 
-        // Replace number + multiplier (e.g., "75 ہزار", "75ہزار", "2 لاکھ", "1.5 crore", "75 hazar", "75 thousand")
+        // Replace number + multiplier (e.g., "75 ہزار", "75ہزار", "35 हजार", "2 لاکھ", "1.5 crore", "75 hazar")
         val multiplierRegex = Regex(
-            "(?:RS_MARKER\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(ہزار|hazaar|hazar|thousand|k|لاکھ|lakh|lac|کروڑ|crore|karor)(?=$|[\\s.,!?])",
+            "(?:RS_MARKER\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(ہزار|हज़ार|हजार|hazaar|hazar|thousand|k|لاکھ|लाख|lakh|lac|کروڑ|करोड़|crore|karor)(?=$|[\\s.,!?])",
             RegexOption.IGNORE_CASE
         )
         text = multiplierRegex.replace(text) { m ->
             val rawNum = m.groupValues[1].replace(",", "").toDoubleOrNull() ?: return@replace m.value
             val unit = m.groupValues[2].lowercase(Locale.US)
             val multiplier = when (unit) {
-                "ہزار", "hazar", "hazaar", "thousand", "k" -> 1_000.0
-                "لاکھ", "lakh", "lac" -> 100_000.0
-                "کروڑ", "crore", "karor" -> 10_000_000.0
+                "ہزار", "हज़ार", "हजार", "hazar", "hazaar", "thousand", "k" -> 1_000.0
+                "لاکھ", "लाख", "lakh", "lac" -> 100_000.0
+                "کروڑ", "करोड़", "crore", "karor" -> 10_000_000.0
                 else -> 1.0
             }
             val total = rawNum * multiplier
@@ -223,7 +232,7 @@ object PakistaniFormatters {
         }
 
         val standaloneCurrencyRegex = Regex(
-            "(?<!Rs\\.\\s)(?<!Rs\\.)(?<![,\\d.])(\\b\\d{1,3}(?:,\\d{2,3})+\\b|\\b\\d{3,}\\b|\\b[5-9]\\d\\b)(?![,\\d.])(?!\\s*(?:ton|tons|ٹن|kg|liter|liters|litre|litres|unit|units|یونٹ|میٹر|meter|%|percent|saal|sal|year|years|month|months|chai|bottle|bottles|برف))",
+            "(?<!Rs\\.\\s)(?<!Rs\\.)(?<![,\\d.])(\\b\\d{1,3}(?:,\\d{2,3})+\\b|\\b\\d{3,}\\b|\\b[5-9]\\d\\b)(?![,\\d.])(?!\\s*(?:ton|tons|ٹن|टन|block|blocks|بلاک|بلاکس|ब्लॉक|ब्लॉक्स|pcs|piece|pieces|kg|liter|liters|litre|litres|unit|units|یونٹ|میٹر|meter|%|percent|saal|sal|year|years|month|months|chai|bottle|bottles|برف|बर्फ))",
             RegexOption.IGNORE_CASE
         )
         text = standaloneCurrencyRegex.replace(text) { m ->
@@ -238,7 +247,7 @@ object PakistaniFormatters {
         }
 
         // Strip trailing currency words left orphaned after Rs. X formatting (e.g., "Rs. 75,000 روپے")
-        text = text.replace(Regex("(?<=\\d)\\s*(?:روپے|rupees|rupay|rs|pkr)(?=$|[\\s.,!?])", RegexOption.IGNORE_CASE), "")
+        text = text.replace(Regex("(?<=\\d)\\s*(?:روپے|रुपये|रुपए|rupees|rupay|rs|pkr)(?=$|[\\s.,!?])", RegexOption.IGNORE_CASE), "")
         return text.replace(Regex("\\s+"), " ").trim()
     }
 

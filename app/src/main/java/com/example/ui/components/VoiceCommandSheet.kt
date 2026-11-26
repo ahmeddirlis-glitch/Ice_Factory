@@ -2,9 +2,15 @@ package com.example.ui.components
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,22 +35,23 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hearing
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Scale
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -65,6 +73,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -84,17 +94,22 @@ import com.example.ui.theme.DeepBlue
 import com.example.ui.theme.RoyalBlue
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.SuccessGreenSoft
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun VoiceCommandBottomSheet(
     speechState: SpeechUiState,
     voiceUiState: com.example.ui.viewmodel.VoiceUiState,
+    userName: String,
+    heyIceWakeEnabled: Boolean,
     strings: AppStrings,
     onSelectLocale: (String) -> Unit,
     onToggleAutoSave: (Boolean) -> Unit,
+    onToggleHeyIceWake: (Boolean) -> Unit,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
+    onStopSpeaking: () -> Unit,
     onSubmitTranscript: (String) -> Unit,
     onUpdateIntent: (ParsedVoiceIntent) -> Unit,
     onRemoveIntent: (String) -> Unit,
@@ -119,7 +134,7 @@ fun VoiceCommandBottomSheet(
     LaunchedEffect(speechState.resultVersion) {
         if (speechState.resultVersion > 0L && speechState.finalText.isNotBlank()) {
             val normalized = PakistaniFormatters.normalizeVoiceTranscript(speechState.finalText)
-            manualInput = normalized
+            manualInput = ""
             keyboardController?.hide()
             onSubmitTranscript(normalized)
         }
@@ -135,7 +150,7 @@ fun VoiceCommandBottomSheet(
     val submitCurrentInput: () -> Unit = {
         val normalized = PakistaniFormatters.normalizeVoiceTranscript(manualInput)
         if (normalized.isNotBlank()) {
-            manualInput = normalized
+            manualInput = ""
             keyboardController?.hide()
             onSubmitTranscript(normalized)
         }
@@ -146,6 +161,18 @@ fun VoiceCommandBottomSheet(
     ) { granted ->
         if (granted) onStartListening()
     }
+
+    val wakePermissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val micGranted = perms[Manifest.permission.RECORD_AUDIO] == true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (micGranted) {
+            onToggleHeyIceWake(true)
+        }
+    }
+
+    val firstName = remember(userName) { userName.trim().substringBefore(" ").ifBlank { "Friend" } }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -170,30 +197,79 @@ fun VoiceCommandBottomSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = RoyalBlue)
-                    Text(
-                        text = strings.voiceCommandTitle,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = RoyalBlue)
+                    Column {
+                        Text(
+                            text = "Brohi Ice Voice Assistant",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = "English • اردو • हिन्दी  |  Hi $firstName",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.testTag("voice_close_button")) {
                     Icon(Icons.Filled.Close, contentDescription = "Close Voice Sheet")
                 }
             }
 
-            // Language Chips + Confirmation Pop-up / Auto-Save mode toggle
+            // Language Chips + Hey Ice Wake-Word + Auto-Save mode
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("ur-PK" to "Urdu", "en-IN" to "English", "hi-IN" to "Hindi").forEach { (tag, label) ->
+                listOf("ur-PK" to "اردو / Urdu", "hi-IN" to "हिन्दी / Hindi", "en-IN" to "English").forEach { (tag, label) ->
                     FilterChip(
                         selected = speechState.selectedLocaleTag == tag,
                         onClick = { onSelectLocale(tag) },
-                        label = { Text(label, maxLines = 1, softWrap = false) }
+                        label = { Text(label, maxLines = 1, softWrap = false, fontSize = 12.sp) }
                     )
                 }
+                FilterChip(
+                    selected = heyIceWakeEnabled,
+                    onClick = {
+                        if (heyIceWakeEnabled) {
+                            onToggleHeyIceWake(false)
+                        } else {
+                            val needed = buildList {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                    add(Manifest.permission.RECORD_AUDIO)
+                                }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    add(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            }
+                            if (needed.isEmpty()) onToggleHeyIceWake(true)
+                            else wakePermissionsLauncher.launch(needed.toTypedArray())
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Hearing,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            if (heyIceWakeEnabled) "Hey Ice: ON" else "Hey Ice: OFF",
+                            maxLines = 1,
+                            softWrap = false,
+                            fontSize = 12.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = SuccessGreenSoft,
+                        selectedLabelColor = Color(0xFF0B4F24),
+                        selectedLeadingIconColor = SuccessGreen
+                    ),
+                    modifier = Modifier.testTag("voice_wake_word_chip")
+                )
                 FilterChip(
                     selected = voiceUiState.autoSaveEnabled,
                     onClick = { onToggleAutoSave(!voiceUiState.autoSaveEnabled) },
@@ -208,44 +284,160 @@ fun VoiceCommandBottomSheet(
                         Text(
                             if (voiceUiState.autoSaveEnabled) "Auto-Save: ON" else "Confirm Pop-up: ON",
                             maxLines = 1,
-                            softWrap = false
+                            softWrap = false,
+                            fontSize = 12.sp
                         )
                     },
                     modifier = Modifier.testTag("voice_auto_save_chip")
                 )
             }
 
-            // Central Mic Trigger
+            // Conversational Chat History (Assistant + User multi-turn)
+            if (voiceUiState.conversationTurns.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFF3F8FF),
+                    border = BorderStroke(1.dp, RoyalBlue.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        voiceUiState.conversationTurns.takeLast(6).forEach { turn ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (turn.isUser) Arrangement.End else Arrangement.Start
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(
+                                        topStart = 12.dp,
+                                        topEnd = 12.dp,
+                                        bottomStart = if (turn.isUser) 12.dp else 4.dp,
+                                        bottomEnd = if (turn.isUser) 4.dp else 12.dp
+                                    ),
+                                    color = when {
+                                        turn.isUser -> RoyalBlue
+                                        turn.isClarificationQuestion -> Color(0xFFE0F2FE)
+                                        else -> Color.White
+                                    },
+                                    border = if (!turn.isUser) {
+                                        BorderStroke(
+                                            1.dp,
+                                            if (turn.isClarificationQuestion) RoyalBlue.copy(alpha = 0.45f)
+                                            else Color(0xFFD5E3F8)
+                                        )
+                                    } else null,
+                                    modifier = Modifier.widthIn(max = 285.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                        Text(
+                                            text = if (turn.isUser) firstName else "Brohi Ice AI",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (turn.isUser) Color.White.copy(alpha = 0.8f) else RoyalBlue
+                                        )
+                                        Text(
+                                            text = turn.text,
+                                            fontSize = 13.sp,
+                                            lineHeight = 18.sp,
+                                            color = if (turn.isUser) Color.White else DeepBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Awaiting Clarification Banner (e.g. Rs. 35,000 sale waiting for block count)
+            if (voiceUiState.pendingDraft != null && voiceUiState.awaitingField.isNotBlank()) {
+                val draft = voiceUiState.pendingDraft
+                val draftInfo = buildString {
+                    append("Pending: ${draft.intentType}")
+                    if (draft.amount > 0) append(" • ${PakistaniFormatters.formatPkr(draft.amount)}")
+                    if (draft.quantity > 0) append(" • ${draft.quantity} blocks")
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "$draftInfo — Reply with ${voiceUiState.awaitingField} (or say 'default rate' / 'cancel')",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF92400E),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
+            // Central Animated Mic / Speaking Orb
             val micBg by animateColorAsState(
-                if (speechState.isListening) DangerRed else RoyalBlue,
+                when {
+                    speechState.isListening -> DangerRed
+                    speechState.isSpeaking -> Color(0xFF0EA5E9)
+                    else -> RoyalBlue
+                },
                 label = "micColor"
             )
+            val pulseTransition = rememberInfiniteTransition(label = "micPulse")
+            val pulseScale by pulseTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = if (speechState.isListening || speechState.isSpeaking) 1.12f else 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(650),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "micScale"
+            )
+
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(76.dp)
+                        .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(micBg)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(micBg.copy(alpha = 0.9f), micBg)
+                            )
+                        )
                         .clickable {
-                            if (speechState.isListening) {
-                                onStopListening()
-                            } else {
-                                val granted = ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.RECORD_AUDIO
-                                ) == PackageManager.PERMISSION_GRANTED
-                                if (granted) onStartListening()
-                                else audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            when {
+                                speechState.isListening -> onStopListening()
+                                speechState.isSpeaking -> {
+                                    onStopSpeaking()
+                                    val granted = ContextCompat.checkSelfPermission(
+                                        context, Manifest.permission.RECORD_AUDIO
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) onStartListening()
+                                    else audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                                else -> {
+                                    val granted = ContextCompat.checkSelfPermission(
+                                        context, Manifest.permission.RECORD_AUDIO
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) onStartListening()
+                                    else audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
                             }
                         }
                         .testTag("voice_sheet_mic_button"),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (speechState.isListening) Icons.Filled.Stop else Icons.Filled.Mic,
+                        imageVector = when {
+                            speechState.isListening -> Icons.Filled.Stop
+                            speechState.isSpeaking -> Icons.AutoMirrored.Filled.VolumeUp
+                            else -> Icons.Filled.Mic
+                        },
                         contentDescription = if (speechState.isListening) "Stop listening" else "Start listening",
                         tint = Color.White,
                         modifier = Modifier.size(34.dp)
@@ -254,9 +446,10 @@ fun VoiceCommandBottomSheet(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = when {
-                        speechState.isListening -> "Listening... Tap Stop when done speaking"
-                        voiceUiState.autoSaveEnabled -> "Auto-saves directly to Expenses, Sales, or Credit Recovery"
-                        else -> "Speak or type below — a confirmation pop-up opens before saving"
+                        speechState.isListening -> "Listening... Speak in English, Urdu, or Hindi"
+                        speechState.isSpeaking -> "Speaking reply... Tap orb to interrupt & talk"
+                        voiceUiState.awaitingField.isNotBlank() -> "Waiting for your answer (${voiceUiState.awaitingField})..."
+                        else -> "Tap mic or say \"Hey Ice\" (اے آئس / हे आइस) anytime"
                     },
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -277,7 +470,7 @@ fun VoiceCommandBottomSheet(
                 onValueChange = { manualInput = it },
                 englishLabel = strings.speakOrTypeHint,
                 urduLabel = "آواز یا ٹیکسٹ لکھیں",
-                leadingIcon = Icons.Filled.Mic,
+                leadingIcon = Icons.Filled.GraphicEq,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submitCurrentInput() }),
                 modifier = Modifier
@@ -289,12 +482,12 @@ fun VoiceCommandBottomSheet(
                         enabled = manualInput.isNotBlank() && !voiceUiState.isParsing,
                         modifier = Modifier.testTag("voice_parse_button")
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "Process voice command", tint = RoyalBlue)
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send to assistant", tint = RoyalBlue)
                     }
                 }
             )
 
-            // Prominent Primary Action Button so users never miss how to process & record typed/spoken text
+            // Prominent Primary Action Button
             IcyGlossyButton(
                 onClick = submitCurrentInput,
                 enabled = manualInput.isNotBlank() && !voiceUiState.isParsing && !speechState.isListening,
@@ -304,17 +497,19 @@ fun VoiceCommandBottomSheet(
                     .testTag("voice_analyze_action_button")
             ) {
                 Icon(
-                    Icons.Filled.Send,
+                    Icons.AutoMirrored.Filled.Send,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (voiceUiState.autoSaveEnabled) {
-                        "Analyze & Save Entry (انٹری محفوظ کریں)"
+                    text = if (voiceUiState.awaitingField.isNotBlank()) {
+                        "Reply to Assistant (جواب بھیجیں)"
+                    } else if (voiceUiState.autoSaveEnabled) {
+                        "Ask / Auto-Save (بولیں یا محفوظ کریں)"
                     } else {
-                        "Analyze & Open Confirmation (انٹری چیک کریں)"
+                        "Ask & Review Entry (تجزیہ کریں)"
                     },
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
@@ -322,22 +517,21 @@ fun VoiceCommandBottomSheet(
                 )
             }
 
-            // Quick Sample Hints
+            // Quick Sample Chips demonstrating blocks+total, clarification, and expenses
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf(
-                    "Rs. 75,000 electricity bill",
-                    "Rs. 15,000 ki baraf sale hui",
-                    "Al-Madina ne Rs. 10,000 udhar diya"
+                    "35 hazar sale aur 15 blocks",
+                    "35,000 ki ice sale hui",
+                    "Rs. 75,000 bijli bill"
                 ).forEach { sample ->
                     Surface(
                         onClick = {
-                            val normalized = PakistaniFormatters.normalizeVoiceTranscript(sample)
-                            manualInput = normalized
+                            manualInput = ""
                             keyboardController?.hide()
-                            onSubmitTranscript(normalized)
+                            onSubmitTranscript(sample)
                         },
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -362,12 +556,11 @@ fun VoiceCommandBottomSheet(
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Analyzing command...", fontSize = 13.sp)
+                    Text("Brohi Ice AI is thinking...", fontSize = 13.sp)
                 }
             }
 
-            if (!voiceUiState.spokenAnswer.isNullOrBlank()) {
-                val isReceipt = voiceUiState.spokenAnswer.startsWith("✓")
+            if (!voiceUiState.spokenAnswer.isNullOrBlank() && voiceUiState.spokenAnswer.startsWith("✓")) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = SuccessGreenSoft,
@@ -379,14 +572,12 @@ fun VoiceCommandBottomSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (isReceipt) {
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = SuccessGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = SuccessGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Text(
                             text = voiceUiState.spokenAnswer,
                             color = Color(0xFF0B4F24),
@@ -408,7 +599,6 @@ fun VoiceCommandBottomSheet(
         }
     }
 
-    // Dedicated Confirmation Pop-up Box shown prominently on top of screen whenever entries are parsed
     if (voiceUiState.pendingIntents.isNotEmpty()) {
         VoiceConfirmationPopupDialog(
             intents = voiceUiState.pendingIntents,
@@ -481,6 +671,9 @@ private fun EditableIntentCard(
             }
         )
     }
+    var blocksText by remember(intent.id) {
+        mutableStateOf(if (intent.quantity > 0L) intent.quantity.toString() else "")
+    }
     var category by remember(intent.id) { mutableStateOf(intent.category) }
     var customerOrSource by remember(intent.id) { mutableStateOf(intent.customerOrSourceName) }
 
@@ -526,10 +719,14 @@ private fun EditableIntentCard(
                         color = RoyalBlue
                     )
                 } else if (intent.amount > 0) {
+                    val unitRateLabel = if (intent.quantity > 0L) {
+                        val perBlock = (intent.amount / intent.quantity.toDouble()).roundToLong()
+                        " (${intent.quantity} blk @ Rs.$perBlock)"
+                    } else ""
                     Text(
-                        text = PakistaniFormatters.formatPkr(intent.amount),
+                        text = PakistaniFormatters.formatPkr(intent.amount) + unitRateLabel,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         maxLines = 1,
                         softWrap = false,
                         color = SuccessGreen
@@ -540,7 +737,6 @@ private fun EditableIntentCard(
                 }
             }
 
-            // Quick Entry Type Switcher (lets user switch Expense <-> Sale <-> Credit if needed before saving)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -615,13 +811,31 @@ private fun EditableIntentCard(
                         if (intent.intentType == "PRODUCTION") {
                             onUpdate(intent.copy(tons = parsed))
                         } else {
-                            onUpdate(intent.copy(amount = parsed))
+                            val updatedUnit = if (intent.quantity > 0L && parsed > 0.0) parsed / intent.quantity.toDouble() else 0.0
+                            onUpdate(intent.copy(amount = parsed, unitPrice = updatedUnit))
                         }
                     },
-                    englishLabel = if (intent.intentType == "PRODUCTION") "Tons" else "Amount (Rs.)",
+                    englishLabel = if (intent.intentType == "PRODUCTION") "Tons" else "Total (Rs.)",
                     leadingIcon = if (intent.intentType == "PRODUCTION") Icons.Filled.Scale else Icons.Filled.Payments,
                     keyboardType = KeyboardType.Number,
                     modifier = Modifier.weight(1f)
+                )
+            }
+            if (intent.intentType == "SALE" || intent.intentType == "CREDIT_SALE") {
+                CrystalTextField(
+                    value = blocksText,
+                    onValueChange = { raw ->
+                        val cleaned = PakistaniFormatters.convertUrduDigits(raw).filter { it.isDigit() }
+                        blocksText = cleaned
+                        val qty = cleaned.toLongOrNull() ?: 0L
+                        val unit = if (qty > 0L && intent.amount > 0.0) intent.amount / qty.toDouble() else 0.0
+                        onUpdate(intent.copy(quantity = qty, unitPrice = unit))
+                    },
+                    englishLabel = "Blocks Sold",
+                    urduLabel = "بلاکس کی تعداد",
+                    leadingIcon = Icons.Filled.Inventory2,
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

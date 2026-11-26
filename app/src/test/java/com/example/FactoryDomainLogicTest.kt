@@ -1253,5 +1253,105 @@ class FactoryDomainLogicTest {
         assertTrue(AppRoute.isAllowedFor(UserRole.STAFF, AppRoute.Updates.key))
         assertEquals(AppRoute.Updates, AppRoute.fromKey("updates"))
     }
+
+    @Test
+    fun `voice assistant keeps 35000 total sale exact when 15 blocks are also spoken`() {
+        val repo = VoiceAiRepository()
+        val res = repo.evaluateConversationLocally(
+            rawTranscript = "Aaj 35 hazar ki sale hui hai aur 15 blocks sale hue hain",
+            activeRole = UserRole.OWNER,
+            userName = "Ahmed Khan",
+            preferredLocaleTag = "ur-PK",
+            defaultBlockRate = 1200.0
+        )
+        assertEquals("EXECUTE", res.mode)
+        assertEquals(1, res.intents.size)
+        val intent = res.intents.first()
+        assertEquals("SALE", intent.intentType)
+        assertEquals(35000.0, intent.amount, 0.01)
+        assertEquals(15L, intent.quantity)
+        assertEquals(35000.0 / 15.0, intent.unitPrice, 0.01)
+    }
+
+    @Test
+    fun `voice assistant asks clarifying question when sale lacks blocks and merges follow up reply`() {
+        val repo = VoiceAiRepository()
+        val turn1 = repo.evaluateConversationLocally(
+            rawTranscript = "آج 35 ہزار کی برف سیل ہوئی ہے",
+            activeRole = UserRole.OWNER,
+            userName = "Ahmed Khan",
+            preferredLocaleTag = "ur-PK"
+        )
+        assertEquals("CLARIFY", turn1.mode)
+        assertEquals("blocks", turn1.missingField)
+        assertEquals("ur", turn1.replyLanguage)
+        assertTrue(turn1.shouldReopenMic)
+        assertTrue(turn1.pendingDraft != null)
+        assertEquals(35000.0, turn1.pendingDraft!!.amount, 0.01)
+
+        val turn2 = repo.evaluateConversationLocally(
+            rawTranscript = "10 blocks",
+            activeRole = UserRole.OWNER,
+            userName = "Ahmed Khan",
+            preferredLocaleTag = "ur-PK",
+            pendingDraft = turn1.pendingDraft,
+            awaitingField = turn1.missingField
+        )
+        assertEquals("EXECUTE", turn2.mode)
+        assertEquals(1, turn2.intents.size)
+        assertEquals(35000.0, turn2.intents.first().amount, 0.01)
+        assertEquals(10L, turn2.intents.first().quantity)
+        assertEquals(3500.0, turn2.intents.first().unitPrice, 0.01)
+    }
+
+    @Test
+    fun `hey ice wake word matches english urdu and hindi variants and extracts trailing command`() {
+        val enWake = VoiceAiRepository.matchWakePhrase("Hey Ice")
+        assertTrue(enWake.matched)
+        assertEquals("", enWake.trailingCommand)
+
+        val enWakeCmd = VoiceAiRepository.matchWakePhrase("Hey Ice record 75000 electricity bill")
+        assertTrue(enWakeCmd.matched)
+        assertEquals("record 75000 electricity bill", enWakeCmd.trailingCommand)
+
+        val urWake = VoiceAiRepository.matchWakePhrase("اے آئس آج کتنی سیل ہوئی")
+        assertTrue(urWake.matched)
+        assertTrue(urWake.trailingCommand.contains("آج کتنی سیل ہوئی"))
+
+        val hiWake = VoiceAiRepository.matchWakePhrase("हे आइस 15 ब्लॉक सेल हुए")
+        assertTrue(hiWake.matched)
+        assertTrue(hiWake.trailingCommand.contains("15"))
+
+        assertFalse(VoiceAiRepository.matchWakePhrase("75 hazar bijli bill").matched)
+    }
+
+    @Test
+    fun `trilingual language detector distinguishes english hindi and urdu accurately`() {
+        assertEquals("hi", VoiceAiRepository.detectLanguage("आज पैंतीस हजार की बर्फ सेल हुई", "en-IN"))
+        assertEquals("ur", VoiceAiRepository.detectLanguage("آج پینتیس ہزار کی برف سیل ہوئی", "en-IN"))
+        assertEquals("en", VoiceAiRepository.detectLanguage("Today we sold 15 blocks for 35000", "en-IN"))
+        assertEquals("ur", VoiceAiRepository.detectLanguage("aaj 35 hazar ki sale hui aur 15 blocks bikay", "en-IN"))
+    }
+
+    @Test
+    fun `google auth error classifier identifies offline sha1 mismatch and network issues`() {
+        val offlineMsg = com.example.data.auth.classifyGoogleAuthErrorMessage("any error", isOnline = false)
+        assertTrue(offlineMsg.contains("Internet connection required"))
+
+        val shaMsg = com.example.data.auth.classifyGoogleAuthErrorMessage(
+            rawMessage = "[28444] Developer console is not set up correctly",
+            isOnline = true,
+            appSha1 = "94:10:D7:81"
+        )
+        assertTrue(shaMsg.contains("SHA-1"))
+        assertTrue(shaMsg.contains("94:10:D7:81"))
+
+        val netMsg = com.example.data.auth.classifyGoogleAuthErrorMessage(
+            rawMessage = "A network error (such as timeout) has occurred",
+            isOnline = true
+        )
+        assertTrue(netMsg.contains("Network error"))
+    }
 }
+
 

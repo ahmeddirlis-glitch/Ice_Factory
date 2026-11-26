@@ -1,8 +1,14 @@
 package com.example
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -51,6 +57,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +75,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -75,7 +83,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.data.auth.GoogleAuthHelper
 import com.example.data.auth.GoogleAuthResult
-import com.example.data.auth.authStateFlow
+import com.google.firebase.auth.FirebaseAuth
 import com.example.data.model.UserRole
 import com.example.data.model.canUserEnterMainWorkspace
 import com.example.data.model.formatRemainingFaceDeadline
@@ -87,6 +95,7 @@ import com.example.data.util.RuntimeDiagnosticLogger
 import com.example.data.util.ScreenSnapshotHelper
 import com.example.data.util.getAppStrings
 import com.example.data.voice.VoiceSpeechManager
+import com.example.data.voice.VoiceWakeService
 import com.example.security.configureAppCheck
 import com.example.ui.audit.AiAuditOverlayController
 import com.example.ui.audit.AiLiveAuditControlDialog
@@ -144,14 +153,19 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val wakeTriggerFlow = MutableStateFlow<Pair<Long, String>?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LocalStorageBootstrap.ensureImageCacheConfigured(applicationContext)
         // CRITICAL: Initialize Firebase App Check with Launch Intent BEFORE any Firebase/ViewModel calls
         configureAppCheck(this, intent)
+        handleWakeIntent(intent)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(
                 android.graphics.Color.TRANSPARENT,
@@ -160,89 +174,155 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            BrohiIceFactoryRoot(activity = this)
+            BrohiIceFactoryRoot(
+                activity = this,
+                wakeTriggerState = wakeTriggerFlow,
+                onConsumeWakeTrigger = { wakeTriggerFlow.value = null }
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleWakeIntent(intent)
+    }
+
+    private fun handleWakeIntent(intent: Intent?) {
+        if (intent == null) return
+        val isWake = intent.action == VoiceWakeService.ACTION_WAKE_TRIGGERED ||
+            intent.getBooleanExtra(VoiceWakeService.EXTRA_WAKE_TRIGGERED, false)
+        if (isWake) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            } else {
+                @Suppress("DEPRECATION")
+                window.addFlags(
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                )
+            }
+            val trailingCmd = intent.getStringExtra(VoiceWakeService.EXTRA_WAKE_COMMAND).orEmpty()
+            wakeTriggerFlow.value = System.currentTimeMillis() to trailingCmd
         }
     }
 }
 
 @Composable
-private fun BrohiIceFactoryRoot(activity: ComponentActivity) {
+private fun BrohiIceFactoryRoot(
+    activity: ComponentActivity,
+    wakeTriggerState: StateFlow<Pair<Long, String>?>,
+    onConsumeWakeTrigger: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preferencesManager = remember { PreferencesManager(context.applicationContext) }
     val googleAuthHelper = remember { GoogleAuthHelper(context.applicationContext) }
 
     val prefs by preferencesManager.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences())
-    val currentUser by Firebase.auth.authStateFlow().collectAsStateWithLifecycle(initialValue = Firebase.auth.currentUser)
+    var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
+    DisposableEffect(Unit) {
+        val auth = Firebase.auth
+        currentUser = auth.currentUser
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            currentUser = firebaseAuth.currentUser
+        }
+        auth.addAuthStateListener(listener)
+        onDispose {
+            auth.removeAuthStateListener(listener)
+        }
+    }
 
     val strings = remember(prefs.language) { getAppStrings(prefs.language) }
+    val wakeEvent by wakeTriggerState.collectAsStateWithLifecycle()
     var showSplash by rememberSaveable { mutableStateOf(true) }
     var hasLoggedInThisLaunch by rememberSaveable { mutableStateOf(false) }
     var isSigningIn by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
+    var authCancelNotice by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(wakeEvent, currentUser) {
+        if (wakeEvent != null && currentUser != null) {
+            showSplash = false
+            hasLoggedInThisLaunch = true
+        }
+    }
 
     BrohiIceTheme(
         darkTheme = prefs.darkMode,
         isUrduRtl = prefs.language == "ur"
     ) {
+        val activeUser = currentUser
         if (showSplash) {
             SplashScreen(
                 strings = strings,
                 onTimeout = { showSplash = false }
             )
-        } else if (!hasLoggedInThisLaunch || currentUser == null) {
+        } else if (!hasLoggedInThisLaunch || activeUser == null) {
             val launchGoogleAuth: (hint: String, pendingJson: String?) -> Unit = { hint, pendingJson ->
-                scope.launch {
-                    isSigningIn = true
-                    authError = null
-                    preferencesManager.setOwnerPreviewRole(null)
-                    preferencesManager.setPendingRegistrationJson(pendingJson ?: "")
-                    if (prefs.rememberMe && hint.isNotBlank()) {
-                        preferencesManager.setSavedEmailHint(hint)
-                    }
-                    val online = LocalStorageBootstrap.isNetworkAvailable(context)
-                    if (!online && pendingJson == null && currentUser != null) {
-                        isSigningIn = false
-                        hasLoggedInThisLaunch = true
-                        Toast.makeText(
-                            context,
-                            "Offline login — using local database (will sync when online)",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@launch
-                    }
-                    when (val result = googleAuthHelper.signInWithGoogleInteractive(activity)) {
-                        is GoogleAuthResult.Success -> {
+                if (!isSigningIn) {
+                    activity.lifecycleScope.launch {
+                        isSigningIn = true
+                        authError = null
+                        authCancelNotice = null
+                        try {
+                            preferencesManager.setOwnerPreviewRole(null)
+                            preferencesManager.setPendingRegistrationJson(pendingJson ?: "")
+                            if (prefs.rememberMe && hint.isNotBlank()) {
+                                preferencesManager.setSavedEmailHint(hint)
+                            }
+                            val online = LocalStorageBootstrap.isNetworkAvailable(context)
+                            if (!online && pendingJson == null && currentUser != null) {
+                                hasLoggedInThisLaunch = true
+                                Toast.makeText(
+                                    context,
+                                    "Offline login — using local database (will sync when online)",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@launch
+                            }
+                            when (val result = googleAuthHelper.signInWithGoogleInteractive(activity, isOnline = online)) {
+                                is GoogleAuthResult.Success -> {
+                                    currentUser = result.user
+                                    authError = null
+                                    authCancelNotice = null
+                                    hasLoggedInThisLaunch = true
+                                }
+                                is GoogleAuthResult.Cancelled -> {
+                                    if (pendingJson != null) {
+                                        preferencesManager.setPendingRegistrationJson("")
+                                    }
+                                    val reason = result.reason?.trim().orEmpty()
+                                    val looksLikeUserDismissed = reason.isBlank() ||
+                                        reason.contains("cancelled by the user", ignoreCase = true) ||
+                                        reason.contains("canceled by the user", ignoreCase = true)
+                                    if (looksLikeUserDismissed) {
+                                        authCancelNotice = "Google Sign-In did not complete. Tap Continue with Google to retry."
+                                    } else {
+                                        authError = "Google Sign-In did not complete ($reason). Please tap Continue with Google to try again."
+                                    }
+                                }
+                                is GoogleAuthResult.NoSavedCredentials -> {
+                                    if (pendingJson != null) {
+                                        preferencesManager.setPendingRegistrationJson("")
+                                    }
+                                    authError = if (!online) {
+                                        "Internet connection required for first-time Google Sign-In or Registration."
+                                    } else {
+                                        "No Google account found on device. Please add a Google account in device Settings and try again."
+                                    }
+                                }
+                                is GoogleAuthResult.Error -> {
+                                    if (pendingJson != null) {
+                                        preferencesManager.setPendingRegistrationJson("")
+                                    }
+                                    authError = result.message
+                                }
+                            }
+                        } finally {
                             isSigningIn = false
-                            hasLoggedInThisLaunch = true
-                        }
-                        is GoogleAuthResult.Cancelled -> {
-                            isSigningIn = false
-                            if (pendingJson != null) {
-                                preferencesManager.setPendingRegistrationJson("")
-                            }
-                        }
-                        is GoogleAuthResult.NoSavedCredentials -> {
-                            isSigningIn = false
-                            if (pendingJson != null) {
-                                preferencesManager.setPendingRegistrationJson("")
-                            }
-                            authError = if (!online) {
-                                "Internet connection required for first-time Google Sign-In or Registration."
-                            } else {
-                                "No Google account found on device."
-                            }
-                        }
-                        is GoogleAuthResult.Error -> {
-                            isSigningIn = false
-                            if (pendingJson != null) {
-                                preferencesManager.setPendingRegistrationJson("")
-                            }
-                            authError = if (!online) {
-                                "Internet connection required for Google Sign-In or Registration."
-                            } else {
-                                result.message
-                            }
                         }
                     }
                 }
@@ -254,6 +334,21 @@ private fun BrohiIceFactoryRoot(activity: ComponentActivity) {
                 rememberMe = prefs.rememberMe,
                 isSigningIn = isSigningIn,
                 errorMessage = authError,
+                cancelNotice = authCancelNotice,
+                existingSignedInEmail = activeUser?.email?.takeIf { it.isNotBlank() }
+                    ?: activeUser?.displayName?.takeIf { it.isNotBlank() },
+                onContinueExistingSession = {
+                    if (activeUser != null) {
+                        activity.lifecycleScope.launch {
+                            preferencesManager.setOwnerPreviewRole(null)
+                            preferencesManager.setPendingRegistrationJson("")
+                            authError = null
+                            authCancelNotice = null
+                            hasLoggedInThisLaunch = true
+                        }
+                    }
+                },
+                onDismissError = { authError = null },
                 onRememberMeChange = { checked ->
                     scope.launch { preferencesManager.setRememberMe(checked) }
                 },
@@ -265,19 +360,27 @@ private fun BrohiIceFactoryRoot(activity: ComponentActivity) {
                 }
             )
         } else {
-            AuthenticatedFactoryShell(
-                activity = activity,
-                user = currentUser!!,
-                prefs = prefs,
-                onSignOut = {
-                    hasLoggedInThisLaunch = false
-                    scope.launch {
-                        preferencesManager.setPendingRegistrationJson("")
-                        preferencesManager.setOwnerPreviewRole(null)
-                        googleAuthHelper.signOut()
+            key(activeUser.uid) {
+                AuthenticatedFactoryShell(
+                    activity = activity,
+                    user = activeUser,
+                    prefs = prefs,
+                    wakeEvent = wakeEvent,
+                    onConsumeWakeTrigger = onConsumeWakeTrigger,
+                    onSignOut = {
+                        hasLoggedInThisLaunch = false
+                        authError = null
+                        authCancelNotice = null
+                        VoiceWakeService.stop(context)
+                        activity.lifecycleScope.launch {
+                            preferencesManager.setPendingRegistrationJson("")
+                            preferencesManager.setOwnerPreviewRole(null)
+                            googleAuthHelper.signOut()
+                            currentUser = null
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }
@@ -287,6 +390,8 @@ private fun AuthenticatedFactoryShell(
     activity: ComponentActivity,
     user: FirebaseUser,
     prefs: AppPreferences,
+    wakeEvent: Pair<Long, String>?,
+    onConsumeWakeTrigger: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val context = LocalContext.current
@@ -380,6 +485,62 @@ private fun AuthenticatedFactoryShell(
     val displayName = userProfile?.displayName?.ifBlank { user.displayName ?: "Ahmed Khan" }
         ?: user.displayName
         ?: "Ahmed Khan"
+
+    LaunchedEffect(prefs.voiceWakeLang) {
+        if (prefs.voiceWakeLang.isNotBlank()) {
+            speechManager.setLocaleTag(prefs.voiceWakeLang)
+        }
+    }
+
+    LaunchedEffect(approvalStatus, prefs.heyIceWakeEnabled, displayName, prefs.voiceWakeLang) {
+        if (canUserEnterMainWorkspace(approvalStatus)) {
+            val micGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (prefs.heyIceWakeEnabled && micGranted) {
+                VoiceWakeService.startOrUpdate(
+                    context = context,
+                    userName = displayName,
+                    localeTag = prefs.voiceWakeLang.ifBlank { "ur-PK" }
+                )
+            } else {
+                VoiceWakeService.stop(context)
+            }
+        }
+    }
+
+    LaunchedEffect(wakeEvent, approvalStatus, displayName, speechUiState.selectedLocaleTag) {
+        val ev = wakeEvent
+        if (ev != null && canUserEnterMainWorkspace(approvalStatus)) {
+            onConsumeWakeTrigger()
+            speechManager.clearResult()
+            showVoiceSheet = true
+            val trailingCmd = ev.second.trim()
+            if (trailingCmd.isNotBlank()) {
+                val isOnline = LocalStorageBootstrap.isNetworkAvailable(context)
+                viewModel.parseVoiceTranscript(
+                    transcript = trailingCmd,
+                    isOnline = isOnline,
+                    preferredLocaleTag = speechUiState.selectedLocaleTag,
+                    userName = displayName
+                ) { reply, lang, reopenMic ->
+                    speechManager.speak(reply, lang) {
+                        if (reopenMic) speechManager.startListening()
+                    }
+                }
+            } else {
+                viewModel.startWakeGreeting(
+                    userName = displayName,
+                    preferredLocaleTag = speechUiState.selectedLocaleTag
+                ) { greeting, lang, reopenMic ->
+                    speechManager.speak(greeting, lang) {
+                        if (reopenMic) speechManager.startListening()
+                    }
+                }
+            }
+        }
+    }
 
     // STRICT APPROVAL GATE: Unapproved users NEVER enter Dashboard / Main Workspace
     if (approvalStatus == "LOADING") {
@@ -1008,7 +1169,14 @@ private fun AuthenticatedFactoryShell(
                                 auditPanelInitialTab = 1
                                 viewModel.openAuditPanel(currentRouteKey, screenTitle)
                             },
-                            onClearAiAuditInbox = viewModel::clearAuditInbox
+                            onClearAiAuditInbox = viewModel::clearAuditInbox,
+                            heyIceWakeEnabled = prefs.heyIceWakeEnabled,
+                            voiceWakeLang = prefs.voiceWakeLang,
+                            onToggleHeyIceWake = viewModel::setHeyIceWakeEnabled,
+                            onChangeVoiceWakeLang = { tag ->
+                                speechManager.setLocaleTag(tag)
+                                viewModel.setVoiceWakeLang(tag)
+                            }
                         )
                     }
                     composable<AppRoute.About> {
@@ -1098,22 +1266,36 @@ private fun AuthenticatedFactoryShell(
         VoiceCommandBottomSheet(
             speechState = speechUiState,
             voiceUiState = voiceUiState,
+            userName = displayName,
+            heyIceWakeEnabled = prefs.heyIceWakeEnabled,
             strings = strings,
-            onSelectLocale = speechManager::setLocaleTag,
+            onSelectLocale = { tag ->
+                speechManager.setLocaleTag(tag)
+                viewModel.setVoiceWakeLang(tag)
+            },
             onToggleAutoSave = viewModel::setVoiceAutoSave,
+            onToggleHeyIceWake = viewModel::setHeyIceWakeEnabled,
             onStartListening = speechManager::startListening,
             onStopListening = speechManager::stopListening,
+            onStopSpeaking = speechManager::stopSpeaking,
             onSubmitTranscript = { text ->
                 val isOnline = LocalStorageBootstrap.isNetworkAvailable(context)
-                viewModel.parseVoiceTranscript(text, isOnline = isOnline) { reply ->
-                    speechManager.speak(reply)
+                viewModel.parseVoiceTranscript(
+                    transcript = text,
+                    isOnline = isOnline,
+                    preferredLocaleTag = speechUiState.selectedLocaleTag,
+                    userName = displayName
+                ) { reply, lang, reopenMic ->
+                    speechManager.speak(reply, lang) {
+                        if (reopenMic) speechManager.startListening()
+                    }
                 }
             },
             onUpdateIntent = viewModel::updatePendingIntent,
             onRemoveIntent = viewModel::removePendingIntent,
             onConfirmAndSave = {
-                viewModel.confirmAndSavePendingIntents { doneMsg ->
-                    speechManager.speak(doneMsg)
+                viewModel.confirmAndSavePendingIntents { doneMsg, lang ->
+                    speechManager.speak(doneMsg, lang)
                 }
             },
             onCancelPending = viewModel::dismissPendingIntents,

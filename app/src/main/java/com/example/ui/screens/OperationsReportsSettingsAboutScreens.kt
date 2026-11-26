@@ -1,5 +1,12 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -33,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Business
@@ -48,6 +56,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Link
@@ -114,8 +123,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.BuildConfig
 import com.example.R
+import com.example.data.voice.VoiceWakeCoordinator
 import com.example.data.model.AppReleaseConfig
 import com.example.data.model.Expense
 import com.example.data.model.FactoryNotice
@@ -1464,8 +1476,25 @@ fun SettingsScreen(
     onToggleAiAuditEnabled: (Boolean) -> Unit = {},
     onToggleAiAuditAutoWatch: (Boolean) -> Unit = {},
     onOpenAiAuditInbox: () -> Unit = {},
-    onClearAiAuditInbox: () -> Unit = {}
+    onClearAiAuditInbox: () -> Unit = {},
+    heyIceWakeEnabled: Boolean = false,
+    voiceWakeLang: String = "ur-PK",
+    onToggleHeyIceWake: (Boolean) -> Unit = {},
+    onChangeVoiceWakeLang: (String) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val wakeServiceRunning by VoiceWakeCoordinator.isWakeServiceRunning.collectAsStateWithLifecycle()
+    val wakeStatusMsg by VoiceWakeCoordinator.wakeStatusMessage.collectAsStateWithLifecycle()
+    val wakePermissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val micGranted = perms[Manifest.permission.RECORD_AUDIO] == true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (micGranted) {
+            onToggleHeyIceWake(true)
+        }
+    }
+
     var companyName by remember(settings.companyName) { mutableStateOf(settings.companyName) }
     var phoneDigits by remember(settings.phone) { mutableStateOf(PakistaniFormatters.normalizePhoneDigits(settings.phone)) }
     var address by remember(settings.address) { mutableStateOf(settings.address) }
@@ -1529,6 +1558,111 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // Voice Assistant & "Hey Ice" Hands-Free Wake Word Card
+        BrohiCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Hearing,
+                            contentDescription = null,
+                            tint = RoyalBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column {
+                            Text(
+                                "\"Hey Ice\" Voice Wake Word",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.5.sp,
+                                color = DeepBlue
+                            )
+                            Text(
+                                "Say \"Hey Ice\" / \"اے آئس\" / \"हे आइस\" even when screen is off",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = heyIceWakeEnabled,
+                        onCheckedChange = { enable ->
+                            if (!enable) {
+                                onToggleHeyIceWake(false)
+                            } else {
+                                val needed = buildList {
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                        add(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        add(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                                if (needed.isEmpty()) onToggleHeyIceWake(true)
+                                else wakePermissionsLauncher.launch(needed.toTypedArray())
+                            }
+                        },
+                        modifier = Modifier.testTag("settings_hey_ice_switch")
+                    )
+                }
+
+                Text(
+                    text = if (heyIceWakeEnabled && wakeServiceRunning) "Status: $wakeStatusMsg"
+                    else if (heyIceWakeEnabled) "Status: Starting wake listener..."
+                    else "Status: Off (Tap switch to enable hands-free greeting)",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (wakeServiceRunning) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                HorizontalDivider()
+                Text("Assistant Primary Voice Language", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("ur-PK" to "اردو / Urdu", "hi-IN" to "हिन्दी / Hindi", "en-IN" to "English").forEach { (tag, label) ->
+                        FilterChip(
+                            selected = voiceWakeLang == tag,
+                            onClick = { onChangeVoiceWakeLang(tag) },
+                            label = { Text(label, fontSize = 11.5.sp) }
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("settings_battery_opt_button")
+                ) {
+                    Icon(Icons.Filled.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Battery Settings (Allow Unrestricted for Screen-Off Wake)",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
