@@ -1468,7 +1468,6 @@ fun LoginScreen(
             message = errorMessage,
             onDismiss = {
                 dismissedErrorPopup = true
-                onDismissError()
             }
         )
     }

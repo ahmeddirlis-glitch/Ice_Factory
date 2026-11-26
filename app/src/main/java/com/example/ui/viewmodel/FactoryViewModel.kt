@@ -622,6 +622,7 @@ class FactoryViewModel(
                                 publisherName = regName
                             )
                         }
+                        preferencesManager.setPendingRegistrationJson("")
                         _toastMessage.value = "Primary Super Admin workspace activated with Face Biometrics!"
                     } else {
                         val faceEnc = obj.optString("faceTemplateEncrypted").takeIf { it.isNotBlank() }
